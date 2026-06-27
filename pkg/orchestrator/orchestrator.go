@@ -82,10 +82,11 @@ func (o *Orchestrator) Stop(ctx context.Context, g *config.Group) error {
 	return errors.Join(errs...)
 }
 
-// Restart stops then starts.
+// Restart stops (best-effort) then starts (fail-fast). A stop error never
+// blocks the start; it is reported and start proceeds.
 func (o *Orchestrator) Restart(ctx context.Context, g *config.Group) error {
 	if err := o.Stop(ctx, g); err != nil {
-		return err
+		fmt.Fprintf(o.Out, "restart: stop reported errors, continuing to start: %v\n", err)
 	}
 	return o.Start(ctx, g)
 }
