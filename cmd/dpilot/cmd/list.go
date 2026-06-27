@@ -3,8 +3,7 @@ package cmd
 import (
 	"context"
 
-	"github.com/haraldpdl/dpilot/pkg/config"
-	"github.com/haraldpdl/dpilot/pkg/ddev"
+	"github.com/haraldpdl/dpilot/pkg/orchestrator"
 	"github.com/haraldpdl/dpilot/pkg/output"
 	"github.com/spf13/cobra"
 )
@@ -17,33 +16,13 @@ var listCmd = &cobra.Command{
 	Short:   "List groups",
 	Args:    cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		names, err := config.List()
+		summaries, err := orchestrator.GroupSummaries(context.Background(), newClient())
 		if err != nil {
 			return err
 		}
-		projects, err := newClient().List(context.Background())
-		if err != nil {
-			return err
-		}
-		running := map[string]bool{}
-		for _, p := range projects {
-			if p.Status == ddev.StatusRunning {
-				running[p.Name] = true
-			}
-		}
-		rows := make([]output.GroupRow, 0, len(names))
-		for _, n := range names {
-			g, err := config.Load(n)
-			if err != nil {
-				return err
-			}
-			r := output.GroupRow{Name: n, Members: len(g.Members)}
-			for _, m := range g.Members {
-				if running[m] {
-					r.Running++
-				}
-			}
-			rows = append(rows, r)
+		rows := make([]output.GroupRow, 0, len(summaries))
+		for _, s := range summaries {
+			rows = append(rows, output.GroupRow{Name: s.Name, Members: s.Members, Running: s.Running})
 		}
 		return output.Groups(cmd.OutOrStdout(), rows, listJSON)
 	},
