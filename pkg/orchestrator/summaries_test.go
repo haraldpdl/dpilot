@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/haraldpdl/dpilot/pkg/config"
@@ -32,3 +33,23 @@ func TestGroupSummaries(t *testing.T) {
 		t.Fatalf("g2 summary wrong: %+v", got[1])
 	}
 }
+
+func TestGroupSummariesNoGroupsSkipsDdev(t *testing.T) {
+	t.Setenv("DPILOT_HOME", t.TempDir())
+	got, err := GroupSummaries(context.Background(), errListClient{})
+	if err != nil {
+		t.Fatalf("no groups should not error: %v", err)
+	}
+	if len(got) != 0 {
+		t.Fatalf("expected no summaries, got %v", got)
+	}
+}
+
+type errListClient struct{}
+
+func (errListClient) List(context.Context) ([]ddev.Project, error) {
+	return nil, errors.New("ddev List must not be called when there are no groups")
+}
+func (errListClient) Describe(context.Context, string) (*ddev.Describe, error) { return nil, nil }
+func (errListClient) Start(context.Context, string) error                      { return nil }
+func (errListClient) Stop(context.Context, string) error                       { return nil }
