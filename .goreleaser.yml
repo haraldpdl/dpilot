@@ -1,0 +1,15 @@
+version: 2
+project_name: dpilot
+builds:
+  - main: ./cmd/dpilot
+    binary: dpilot
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X github.com/haraldpdl/dpilot/cmd/dpilot/cmd.Version={{.Version}}
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+checksum:
+  name_template: checksums.txt
