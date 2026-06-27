@@ -1,5 +1,8 @@
 version: 2
 project_name: dpilot
+gitea_urls:
+  api: https://github.com/api/v1
+  download: https://github.com
 builds:
   - main: ./cmd/dpilot
     binary: dpilot
