@@ -114,3 +114,7 @@ picker reached from the dashboard's `n` and `e`):
 When stdin or stdout is not a terminal (scripts, CI, pipes), dpilot stays
 non-interactive: bare `dpilot` prints help, and `dpilot create <group>` makes an
 empty group you populate with `dpilot add`.
+
+## License
+
+dpilot is released under the MIT License. See [LICENSE](LICENSE).
