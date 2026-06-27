@@ -89,3 +89,28 @@ Requirements: ddev installed and a project named `dpilot-fixture` registered.
 ```bash
 go test -tags integration ./integration/...
 ```
+
+## Interactive TUI
+
+Run `dpilot` with no arguments in a terminal to open the dashboard, a full-screen
+view of your groups:
+
+- Move with the arrow keys (or `j`/`k`).
+- `s` start, `x` stop, `r` restart the selected group. ddev's output streams,
+  then the dashboard returns and refreshes the running counts.
+- `enter` describe the selected group (members and live state).
+- `n` create a new group, `e` edit the selected group, `D` delete it.
+- `q` quit.
+
+Run `dpilot create <group>` in a terminal to open the group editor (the same
+picker reached from the dashboard's `n` and `e`):
+
+- Move with the arrow keys; `space` adds or removes the highlighted ddev project.
+  Selected projects show their start-order number.
+- `K`/`J` move the highlighted selected project earlier or later in the order.
+- `t` edits the readiness wait_timeout.
+- `enter` saves, `esc` cancels.
+
+When stdin or stdout is not a terminal (scripts, CI, pipes), dpilot stays
+non-interactive: bare `dpilot` prints help, and `dpilot create <group>` makes an
+empty group you populate with `dpilot add`.
