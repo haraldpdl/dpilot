@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/haraldpdl/dpilot/pkg/ddev"
+	"github.com/haraldpdl/dpilot/pkg/tui"
 	"github.com/spf13/cobra"
 )
 
@@ -10,6 +11,9 @@ var Version = "dev"
 
 // newClient builds the ddev client; tests override it.
 var newClient = func() ddev.Client { return ddev.New() }
+
+// isInteractive is the TTY check; overridden in tests.
+var isInteractive = tui.IsInteractive
 
 var rootCmd = &cobra.Command{
 	Use:           "dpilot",
