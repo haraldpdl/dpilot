@@ -17,6 +17,7 @@ const (
 	phaseName editorPhase = iota
 	phaseSelect
 	phaseTimeout
+	phaseNoProjects
 	editorDone
 )
 
@@ -64,7 +65,9 @@ func NewEditor(opts EditorOptions) Editor {
 		nameInput: ni,
 		toInput:   ti,
 	}
-	if !opts.NameFixed && opts.Name == "" {
+	if len(opts.Projects) == 0 {
+		e.phase = phaseNoProjects
+	} else if !opts.NameFixed && opts.Name == "" {
 		e.phase = phaseName
 		e.nameInput.Focus()
 	} else {
@@ -119,6 +122,16 @@ func (e *Editor) move(name string, delta int) {
 func (e Editor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	key, ok := msg.(tea.KeyMsg)
 	if !ok {
+		switch e.phase {
+		case phaseName:
+			var cmd tea.Cmd
+			e.nameInput, cmd = e.nameInput.Update(msg)
+			return e, cmd
+		case phaseTimeout:
+			var cmd tea.Cmd
+			e.toInput, cmd = e.toInput.Update(msg)
+			return e, cmd
+		}
 		return e, nil
 	}
 	switch e.phase {
@@ -163,6 +176,9 @@ func (e Editor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			e.toInput, cmd = e.toInput.Update(msg)
 			return e, cmd
 		}
+	case phaseNoProjects:
+		e.phase = editorDone
+		return e, tea.Quit
 	case phaseSelect:
 		switch {
 		case key.Type == tea.KeyUp || keyRune(key, 'k'):
@@ -211,6 +227,8 @@ func (e Editor) View() string {
 		fmt.Fprintf(&b, "New group name:\n\n%s\n", e.nameInput.View())
 	case phaseTimeout:
 		fmt.Fprintf(&b, "wait_timeout:\n\n%s\n", e.toInput.View())
+	case phaseNoProjects:
+		b.WriteString("No ddev projects found. Press any key to exit.\n")
 	default:
 		fmt.Fprintf(&b, "%s\n\n", titleStyle.Render("Select projects for "+e.name))
 		for i, p := range e.opts.Projects {
