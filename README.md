@@ -17,6 +17,14 @@ dpilot stop mystack       # stop in reverse order
 
 See `docs/specs/` for the design and `docs/plans/` for the implementation plan.
 
+## Screenshots
+
+The dashboard (run `dpilot` with no arguments) and the interactive group editor (`dpilot create <group>`):
+
+![dpilot dashboard](docs/images/dashboard.png)
+
+![dpilot group editor](docs/images/editor.png)
+
 ## Install
 
 **Download a release binary** from the [Gitea releases page](https://github.com/haraldpdl/dpilot/releases),
