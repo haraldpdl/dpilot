@@ -77,3 +77,15 @@ The release workflow (`.gitea/workflows/release.yml`) uses goreleaser to cross-c
 binaries for Linux, macOS, and Windows (amd64 and arm64) and attach them to the
 Gitea release. A `GITEA_TOKEN` repository Actions secret with release scope must be
 configured for the workflow to publish.
+
+## Integration tests
+
+The `integration/` package contains end-to-end tests that drive a real ddev
+binary. They are excluded from normal CI (`go test ./...`) and only run when the
+`integration` build tag is set.
+
+Requirements: ddev installed and a project named `dpilot-fixture` registered.
+
+```bash
+go test -tags integration ./integration/...
+```
