@@ -55,8 +55,12 @@ func TestValidateRejectsDuplicateMembers(t *testing.T) {
 
 func TestLoadRejectsUnknownKeys(t *testing.T) {
 	tempHome(t)
-	_ = os.MkdirAll(mustDir(t), 0o755)
-	_ = os.WriteFile(mustPath(t, "g"), []byte("name: g\nbogus: 1\nmembers: [a]\n"), 0o644)
+	if err := os.MkdirAll(mustDir(t), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(mustPath(t, "g"), []byte("name: g\nbogus: 1\nmembers: [a]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := Load("g"); err == nil {
 		t.Fatal("expected unknown-key error")
 	}
