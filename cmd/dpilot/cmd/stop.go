@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"context"
-
 	"github.com/haraldpdl/dpilot/pkg/config"
 	"github.com/spf13/cobra"
 )
@@ -16,7 +14,9 @@ var stopCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return orch(cmd).Stop(context.Background(), g)
+		ctx, stop := signalCtx()
+		defer stop()
+		return orch(cmd).Stop(ctx, g)
 	},
 }
 

@@ -90,7 +90,7 @@ func Load(name string) (*Group, error) {
 	}
 	data, err := os.ReadFile(p)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			return nil, fmt.Errorf("group %q does not exist", name)
 		}
 		return nil, err
@@ -146,7 +146,7 @@ func Exists(name string) (bool, error) {
 	if err == nil {
 		return true, nil
 	}
-	if os.IsNotExist(err) {
+	if errors.Is(err, os.ErrNotExist) {
 		return false, nil
 	}
 	return false, err
@@ -159,7 +159,7 @@ func Delete(name string) error {
 		return err
 	}
 	if err := os.Remove(p); err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("group %q does not exist", name)
 		}
 		return err
@@ -175,7 +175,7 @@ func List() ([]string, error) {
 	}
 	entries, err := os.ReadDir(d)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			return nil, nil
 		}
 		return nil, err
