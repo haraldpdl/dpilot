@@ -85,3 +85,17 @@ func TestStatusesMapsMissing(t *testing.T) {
 		t.Fatalf("unexpected states: %+v", states)
 	}
 }
+
+func TestRestartStartsEvenIfStopErrors(t *testing.T) {
+	f := newFakeClient()
+	f.stopErr["api"] = errFor("api")
+	f.describeSeq["db"] = []*ddev.Describe{running("db")}
+	f.describeSeq["api"] = []*ddev.Describe{running("api")}
+	o := testOrch(f)
+	if err := o.Restart(context.Background(), grp(120*time.Second, "db", "api")); err != nil {
+		t.Fatalf("restart: %v", err)
+	}
+	if strings.Join(f.started, ",") != "db,api" {
+		t.Fatalf("expected restart to start db,api despite a stop error, got %v", f.started)
+	}
+}
