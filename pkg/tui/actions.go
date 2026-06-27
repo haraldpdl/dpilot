@@ -50,33 +50,13 @@ func ProductionLoader(client ddev.Client) Loader {
 }
 
 func groupRows(client ddev.Client) ([]GroupRow, error) {
-	names, err := config.List()
+	summaries, err := orchestrator.GroupSummaries(context.Background(), client)
 	if err != nil {
 		return nil, err
 	}
-	projects, err := client.List(context.Background())
-	if err != nil {
-		return nil, err
-	}
-	running := map[string]bool{}
-	for _, p := range projects {
-		if p.Status == ddev.StatusRunning {
-			running[p.Name] = true
-		}
-	}
-	rows := make([]GroupRow, 0, len(names))
-	for _, n := range names {
-		g, err := config.Load(n)
-		if err != nil {
-			return nil, err
-		}
-		row := GroupRow{Name: n, Members: len(g.Members)}
-		for _, m := range g.Members {
-			if running[m] {
-				row.Running++
-			}
-		}
-		rows = append(rows, row)
+	rows := make([]GroupRow, 0, len(summaries))
+	for _, s := range summaries {
+		rows = append(rows, GroupRow{Name: s.Name, Members: s.Members, Running: s.Running})
 	}
 	return rows, nil
 }
