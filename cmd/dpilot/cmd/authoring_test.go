@@ -7,6 +7,8 @@ import (
 
 	"github.com/haraldpdl/dpilot/pkg/config"
 	"github.com/haraldpdl/dpilot/pkg/ddev"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 type stubClient struct{ list []ddev.Project }
@@ -16,8 +18,19 @@ func (s stubClient) Describe(context.Context, string) (*ddev.Describe, error) { 
 func (s stubClient) Start(context.Context, string) error                      { return nil }
 func (s stubClient) Stop(context.Context, string) error                       { return nil }
 
+func resetFlags(c *cobra.Command) {
+	c.Flags().VisitAll(func(f *pflag.Flag) {
+		_ = f.Value.Set(f.DefValue)
+		f.Changed = false
+	})
+	for _, sub := range c.Commands() {
+		resetFlags(sub)
+	}
+}
+
 func run(t *testing.T, args ...string) (string, error) {
 	t.Helper()
+	resetFlags(rootCmd)
 	var buf bytes.Buffer
 	rootCmd.SetOut(&buf)
 	rootCmd.SetErr(&buf)
@@ -103,5 +116,51 @@ func TestDeleteGroup(t *testing.T) {
 	}
 	if ok, _ := config.Exists("mystack"); ok {
 		t.Fatal("group should be gone")
+	}
+}
+
+func TestDeleteRefusesWithoutYes(t *testing.T) {
+	t.Setenv("DPILOT_HOME", t.TempDir())
+	withProjects("db")
+	if _, err := run(t, "create", "mystack"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := run(t, "delete", "mystack"); err == nil {
+		t.Fatal("expected delete to refuse without -y")
+	}
+	if ok, _ := config.Exists("mystack"); !ok {
+		t.Fatal("group should still exist after a refused delete")
+	}
+}
+
+func TestAddRejectsDuplicate(t *testing.T) {
+	t.Setenv("DPILOT_HOME", t.TempDir())
+	withProjects("db")
+	_, _ = run(t, "create", "mystack")
+	if _, err := run(t, "add", "mystack", "db"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := run(t, "add", "mystack", "db"); err == nil {
+		t.Fatal("expected duplicate add to error")
+	}
+}
+
+func TestCreateRejectsExisting(t *testing.T) {
+	t.Setenv("DPILOT_HOME", t.TempDir())
+	withProjects("db")
+	if _, err := run(t, "create", "mystack"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := run(t, "create", "mystack"); err == nil {
+		t.Fatal("expected create on existing group to error")
+	}
+}
+
+func TestRemoveRejectsAbsent(t *testing.T) {
+	t.Setenv("DPILOT_HOME", t.TempDir())
+	withProjects("db")
+	_, _ = run(t, "create", "mystack")
+	if _, err := run(t, "remove", "mystack", "ghost"); err == nil {
+		t.Fatal("expected remove of absent member to error")
 	}
 }

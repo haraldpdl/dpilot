@@ -8,14 +8,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var addAfter string
-
 var addCmd = &cobra.Command{
 	Use:   "add <group> <project>",
 	Short: "Add a ddev project to a group",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		groupName, project := args[0], args[1]
+		after, _ := cmd.Flags().GetString("after")
 		g, err := config.Load(groupName)
 		if err != nil {
 			return err
@@ -40,7 +39,7 @@ var addCmd = &cobra.Command{
 				return fmt.Errorf("%q is already a member of %q", project, groupName)
 			}
 		}
-		g.Members = insert(g.Members, project, addAfter)
+		g.Members = insert(g.Members, project, after)
 		if err := config.Save(g); err != nil {
 			return err
 		}
@@ -69,6 +68,6 @@ func insert(members []string, project, after string) []string {
 }
 
 func init() {
-	addCmd.Flags().StringVar(&addAfter, "after", "", "insert after this member instead of appending")
+	addCmd.Flags().String("after", "", "insert after this member instead of appending")
 	rootCmd.AddCommand(addCmd)
 }
