@@ -39,6 +39,18 @@ var addCmd = &cobra.Command{
 				return fmt.Errorf("%q is already a member of %q", project, groupName)
 			}
 		}
+		if after != "" {
+			found := false
+			for _, m := range g.Members {
+				if m == after {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return fmt.Errorf("--after %q is not a member of %q", after, groupName)
+			}
+		}
 		g.Members = insert(g.Members, project, after)
 		if err := config.Save(g); err != nil {
 			return err

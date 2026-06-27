@@ -61,3 +61,14 @@ func TestDescribeJSON(t *testing.T) {
 		t.Fatalf("unexpected describe json: %+v", got)
 	}
 }
+
+func TestDescribeNoAnsiForNonTerminal(t *testing.T) {
+	var buf bytes.Buffer
+	rows := []MemberRow{{Name: "db", Status: "running"}}
+	if err := Describe(&buf, "g", rows, false); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(buf.String(), "\x1b[") {
+		t.Fatalf("a bytes.Buffer is not a terminal; expected no ANSI: %q", buf.String())
+	}
+}

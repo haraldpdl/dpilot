@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"context"
+	"os"
+	"os/signal"
 
 	"github.com/haraldpdl/dpilot/pkg/config"
 	"github.com/haraldpdl/dpilot/pkg/orchestrator"
@@ -14,6 +16,10 @@ func orch(cmd *cobra.Command) *orchestrator.Orchestrator {
 	return o
 }
 
+func signalCtx() (context.Context, context.CancelFunc) {
+	return signal.NotifyContext(context.Background(), os.Interrupt)
+}
+
 var startCmd = &cobra.Command{
 	Use:   "start <group>",
 	Short: "Start all projects in a group, in order",
@@ -23,7 +29,9 @@ var startCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return orch(cmd).Start(context.Background(), g)
+		ctx, stop := signalCtx()
+		defer stop()
+		return orch(cmd).Start(ctx, g)
 	},
 }
 

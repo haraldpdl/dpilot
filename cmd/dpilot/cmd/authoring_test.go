@@ -92,6 +92,16 @@ func TestAddAfterInserts(t *testing.T) {
 	}
 }
 
+func TestAddAfterUnknownAnchorErrors(t *testing.T) {
+	t.Setenv("DPILOT_HOME", t.TempDir())
+	withProjects("db", "api")
+	_, _ = run(t, "create", "mystack")
+	_, _ = run(t, "add", "mystack", "db")
+	if _, err := run(t, "add", "mystack", "api", "--after", "ghost"); err == nil {
+		t.Fatal("expected error when --after anchor is not a member")
+	}
+}
+
 func TestRemoveMember(t *testing.T) {
 	t.Setenv("DPILOT_HOME", t.TempDir())
 	withProjects("db", "api")

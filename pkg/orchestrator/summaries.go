@@ -21,6 +21,9 @@ func GroupSummaries(ctx context.Context, c ddev.Client) ([]GroupSummary, error) 
 	if err != nil {
 		return nil, err
 	}
+	if len(names) == 0 {
+		return nil, nil
+	}
 	projects, err := c.List(ctx)
 	if err != nil {
 		return nil, err
