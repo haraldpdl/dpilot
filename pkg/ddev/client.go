@@ -29,7 +29,17 @@ func New() *CLI {
 	return &CLI{Bin: "ddev", Stdout: os.Stdout, Stderr: os.Stderr}
 }
 
+func (c *CLI) ensure() error {
+	if _, err := exec.LookPath(c.Bin); err != nil {
+		return fmt.Errorf("ddev not found on PATH: install ddev (https://ddev.com) to use dpilot")
+	}
+	return nil
+}
+
 func (c *CLI) capture(ctx context.Context, args ...string) ([]byte, error) {
+	if err := c.ensure(); err != nil {
+		return nil, err
+	}
 	var out, errBuf bytes.Buffer
 	cmd := exec.CommandContext(ctx, c.Bin, args...)
 	cmd.Stdout = &out
@@ -41,6 +51,9 @@ func (c *CLI) capture(ctx context.Context, args ...string) ([]byte, error) {
 }
 
 func (c *CLI) stream(ctx context.Context, args ...string) error {
+	if err := c.ensure(); err != nil {
+		return err
+	}
 	cmd := exec.CommandContext(ctx, c.Bin, args...)
 	cmd.Stdout = c.Stdout
 	cmd.Stderr = c.Stderr
