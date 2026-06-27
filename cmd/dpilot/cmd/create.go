@@ -1,15 +1,20 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/haraldpdl/dpilot/pkg/config"
+	"github.com/haraldpdl/dpilot/pkg/tui"
 	"github.com/spf13/cobra"
 )
 
+// runEditor runs the interactive group editor; overridden in tests.
+var runEditor = tui.RunEditor
+
 var createCmd = &cobra.Command{
 	Use:   "create <group>",
-	Short: "Create a new empty group",
+	Short: "Create a new group (interactive on a terminal)",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		name := args[0]
@@ -20,10 +25,34 @@ var createCmd = &cobra.Command{
 		if ok {
 			return fmt.Errorf("group %q already exists", name)
 		}
-		if err := config.Save(&config.Group{Name: name}); err != nil {
+		if !isInteractive() {
+			if err := config.Save(&config.Group{Name: name}); err != nil {
+				return err
+			}
+			cmd.Printf("created group %q\n", name)
+			return nil
+		}
+		projects, err := newClient().List(context.Background())
+		if err != nil {
 			return err
 		}
-		cmd.Printf("created group %q\n", name)
+		g, err := runEditor(tui.EditorOptions{
+			Name:           name,
+			NameFixed:      true,
+			Projects:       projects,
+			InitialTimeout: config.DefaultWaitTimeout,
+		})
+		if err != nil {
+			return err
+		}
+		if g == nil {
+			cmd.Println("canceled")
+			return nil
+		}
+		if err := config.Save(g); err != nil {
+			return err
+		}
+		cmd.Printf("created group %q with %d member(s)\n", g.Name, len(g.Members))
 		return nil
 	},
 }
