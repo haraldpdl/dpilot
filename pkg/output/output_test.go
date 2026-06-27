@@ -43,3 +43,21 @@ func TestDescribeTableShowsMembersInOrder(t *testing.T) {
 		t.Fatalf("expected db before api: %q", out)
 	}
 }
+
+func TestDescribeJSON(t *testing.T) {
+	var buf bytes.Buffer
+	rows := []MemberRow{{Name: "db", Status: "running"}, {Name: "api", Status: "missing"}}
+	if err := Describe(&buf, "mystack", rows, true); err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Name    string      `json:"name"`
+		Members []MemberRow `json:"members"`
+	}
+	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+		t.Fatalf("describe json invalid: %v", err)
+	}
+	if got.Name != "mystack" || len(got.Members) != 2 || got.Members[1].Name != "api" || got.Members[1].Status != "missing" {
+		t.Fatalf("unexpected describe json: %+v", got)
+	}
+}
