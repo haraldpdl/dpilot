@@ -30,9 +30,13 @@ func TestRealStartDescribeStop(t *testing.T) {
 	if err := o.Start(ctx, g); err != nil {
 		t.Fatalf("start: %v", err)
 	}
+	t.Cleanup(func() { _ = o.Stop(ctx, g) })
 	states, err := o.Statuses(ctx, g)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if len(states) == 0 {
+		t.Fatal("statuses returned empty slice")
 	}
 	if states[0].Status != ddev.StatusRunning {
 		t.Fatalf("expected running, got %q", states[0].Status)
