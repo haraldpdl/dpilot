@@ -10,9 +10,10 @@ import (
 
 func TestBareDpilotInteractiveLaunchesDashboard(t *testing.T) {
 	called := false
+	origClient := newClient
 	isInteractive = func() bool { return true }
 	runDashboard = func(tui.Loader) error { called = true; return nil }
-	defer func() { isInteractive = tui.IsInteractive; runDashboard = tui.RunDashboard }()
+	defer func() { isInteractive = tui.IsInteractive; runDashboard = tui.RunDashboard; newClient = origClient }()
 	newClient = func() ddev.Client { return stubClient{} }
 	if _, err := run(t); err != nil {
 		t.Fatalf("bare dpilot: %v", err)
