@@ -18,8 +18,8 @@ func execAction(verb, group string) tea.Cmd {
 	if err != nil {
 		self = os.Args[0]
 	}
-	return tea.ExecProcess(exec.Command(self, verb, group), func(error) tea.Msg {
-		return refreshMsg{}
+	return tea.ExecProcess(exec.Command(self, verb, group), func(err error) tea.Msg {
+		return actionDoneMsg{err: err}
 	})
 }
 
