@@ -125,3 +125,44 @@ func TestEditorEditModePreloaded(t *testing.T) {
 		t.Fatalf("preloaded timeout wrong: %v", g.WaitTimeout.Duration())
 	}
 }
+
+func TestEditorLowercaseNav(t *testing.T) {
+	e := NewEditor(EditorOptions{Name: "g", NameFixed: true, Projects: projs("a", "b", "c")})
+	e = send(e, runes("j"), runes("j"), kt(tea.KeySpace)) // j j -> cursor on c, select
+	if got := e.Result().Members; len(got) != 1 || got[0] != "c" {
+		t.Fatalf("expected [c] via lowercase j nav, got %v", got)
+	}
+}
+
+func TestEditorReorderNoOpAtEnds(t *testing.T) {
+	e := NewEditor(EditorOptions{Name: "g", NameFixed: true, Projects: projs("a", "b")})
+	e = send(e, kt(tea.KeySpace), kt(tea.KeyDown), kt(tea.KeySpace)) // [a b], cursor on b
+	e = send(e, runes("J"))                                          // b is last; move later is a no-op
+	if got := e.Result().Members; got[0] != "a" || got[1] != "b" {
+		t.Fatalf("J at end should be a no-op, got %v", got)
+	}
+	e = send(e, kt(tea.KeyUp), runes("K")) // cursor on a (first); move earlier is a no-op
+	if got := e.Result().Members; got[0] != "a" || got[1] != "b" {
+		t.Fatalf("K at start should be a no-op, got %v", got)
+	}
+}
+
+func TestEditorReorderNoOpWhenUnselected(t *testing.T) {
+	e := NewEditor(EditorOptions{Name: "g", NameFixed: true, Projects: projs("a", "b")})
+	e = send(e, kt(tea.KeySpace))                        // select a; cursor on a
+	e = send(e, kt(tea.KeyDown), runes("K"), runes("J")) // cursor on b (unselected); reorder no-ops
+	if got := e.Result().Members; len(got) != 1 || got[0] != "a" {
+		t.Fatalf("reorder on an unselected project should be a no-op, got %v", got)
+	}
+}
+
+func TestEditorNoProjectsExits(t *testing.T) {
+	e := NewEditor(EditorOptions{Name: "g", NameFixed: true, Projects: nil})
+	if e.phase != phaseNoProjects {
+		t.Fatal("no projects should start in phaseNoProjects")
+	}
+	e = send(e, kt(tea.KeyEnter))
+	if !e.Done() || e.Saved() {
+		t.Fatal("any key in phaseNoProjects should exit without saving")
+	}
+}

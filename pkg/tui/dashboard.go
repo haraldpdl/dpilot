@@ -9,6 +9,7 @@ import (
 	"github.com/haraldpdl/dpilot/pkg/config"
 	"github.com/haraldpdl/dpilot/pkg/ddev"
 	"github.com/haraldpdl/dpilot/pkg/orchestrator"
+	"github.com/haraldpdl/dpilot/pkg/output"
 )
 
 type dashMode int
@@ -22,12 +23,8 @@ const (
 
 const refreshInterval = 3 * time.Second
 
-// GroupRow is one dashboard row.
-type GroupRow struct {
-	Name    string
-	Members int
-	Running int
-}
+// GroupRow is an alias for output.GroupRow (identical fields) to avoid duplication.
+type GroupRow = output.GroupRow
 
 // Loader supplies the dashboard's data and side effects, injected for testability.
 type Loader struct {
@@ -51,7 +48,7 @@ type statusesMsg struct {
 	err    error
 }
 
-type refreshMsg struct{}
+type actionDoneMsg struct{ err error }
 
 type tickMsg struct{}
 
@@ -112,7 +109,12 @@ func (d Dashboard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			d.mode = modeDescribe
 		}
 		return d, nil
-	case refreshMsg:
+	case actionDoneMsg:
+		if m.err != nil {
+			d.err = m.err.Error()
+		} else {
+			d.err = ""
+		}
 		return d, d.loadRows()
 	case tickMsg:
 		if d.mode == modeList {
@@ -125,6 +127,15 @@ func (d Dashboard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if d.mode == modeEditor {
 		nm, cmd := d.editor.Update(msg)
 		d.editor = nm.(Editor)
+		if d.editor.Done() {
+			if d.editor.Saved() {
+				if err := d.loader.Save(d.editor.Result()); err != nil {
+					d.err = err.Error()
+				}
+			}
+			d.mode = modeList
+			return d, d.loadRows()
+		}
 		return d, cmd
 	}
 	return d, nil
@@ -249,18 +260,13 @@ func (d Dashboard) View() string {
 	if d.mode == modeEditor {
 		return d.editor.View()
 	}
-	var b strings.Builder
 	if d.mode == modeDescribe {
-		fmt.Fprintf(&b, "%s\n\n", titleStyle.Render("describe"))
-		for i, s := range d.describe {
-			fmt.Fprintf(&b, " %d  %-20s %s\n", i+1, s.Name, statusColor(string(s.Status)))
-		}
-		b.WriteString(dimStyle.Render("\nany key to return"))
-		return borderStyle.Render(b.String())
+		return describeView(d.describe)
 	}
+	var b strings.Builder
 	fmt.Fprintf(&b, "%s\n\n", titleStyle.Render("dpilot groups"))
 	if len(d.rows) == 0 {
-		b.WriteString("no groups yet\n")
+		b.WriteString("no groups yet. press n to create one\n")
 	}
 	for i, r := range d.rows {
 		cursor := "  "
