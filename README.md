@@ -1,5 +1,9 @@
 # dpilot
 
+[![CI](https://github.com/haraldpdl/dpilot/actions/workflows/ci.yml/badge.svg)](https://github.com/haraldpdl/dpilot/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/haraldpdl/dpilot)](https://github.com/haraldpdl/dpilot/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 dpilot orchestrates ordered groups of [ddev](https://github.com/ddev/ddev) projects.
 A dpilot group is a named, ordered set of ddev projects defined at
 `~/.dpilot/groups/<name>.yaml`. dpilot starts members in order (waiting for each
@@ -83,21 +87,6 @@ overridden per group with `wait_timeout` in the group YAML.
 
 Member order is the list order in the YAML. To reorder an existing member, use
 `dpilot remove` followed by `dpilot add --after`.
-
-## Releases
-
-Releases are published to GitHub when a `v*` tag is pushed:
-
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-The release workflow (`.github/workflows/release.yml`) uses goreleaser to
-cross-compile binaries for Linux and macOS (amd64 and arm64), attach them to the
-GitHub release, and update the Homebrew formula in `haraldpdl/homebrew-tap`. The
-release itself uses the automatic `GITHUB_TOKEN`; updating the tap needs a
-`HOMEBREW_TAP_TOKEN` secret with write access to the tap repo.
 
 ## Integration tests
 
