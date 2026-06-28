@@ -15,8 +15,6 @@ dpilot describe mystack   # show members and live ddev state (alias: status)
 dpilot stop mystack       # stop in reverse order
 ```
 
-See `docs/specs/` for the design and `docs/plans/` for the implementation plan.
-
 ## Screenshots
 
 The dashboard (run `dpilot` with no arguments) and the interactive group editor (`dpilot create <group>`):
