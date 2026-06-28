@@ -25,8 +25,22 @@ The dashboard (run `dpilot` with no arguments) and the interactive group editor 
 
 ## Install
 
-**Download a release binary** from the [Gitea releases page](https://github.com/haraldpdl/dpilot/releases),
+**Homebrew** (macOS and Linux):
+
+```bash
+brew install haraldpdl/tap/dpilot
+```
+
+**Go** (requires Go 1.25+):
+
+```bash
+go install github.com/haraldpdl/dpilot/cmd/dpilot@latest
+```
+
+**Download a release binary** from the [releases page](https://github.com/haraldpdl/dpilot/releases),
 extract the archive for your OS and architecture, and place `dpilot` on your `PATH`.
+On macOS a downloaded binary is quarantined by Gatekeeper; clear it with
+`xattr -c dpilot`, or install via Homebrew.
 
 **Build from source** (requires Go 1.25+):
 
@@ -72,17 +86,18 @@ Member order is the list order in the YAML. To reorder an existing member, use
 
 ## Releases
 
-Releases are published to Gitea when a `v*` tag is pushed:
+Releases are published to GitHub when a `v*` tag is pushed:
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-The release workflow (`.gitea/workflows/release.yml`) uses goreleaser to cross-compile
-binaries for Linux, macOS, and Windows (amd64 and arm64) and attach them to the
-Gitea release. A `GITEA_TOKEN` repository Actions secret with release scope must be
-configured for the workflow to publish.
+The release workflow (`.github/workflows/release.yml`) uses goreleaser to
+cross-compile binaries for Linux and macOS (amd64 and arm64), attach them to the
+GitHub release, and update the Homebrew formula in `haraldpdl/homebrew-tap`. The
+release itself uses the automatic `GITHUB_TOKEN`; updating the tap needs a
+`HOMEBREW_TAP_TOKEN` secret with write access to the tap repo.
 
 ## Integration tests
 
