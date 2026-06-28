@@ -91,3 +91,15 @@ func mustDir(t *testing.T) string {
 	return d
 }
 func mustPath(t *testing.T, n string) string { d, _ := Dir(); return d + "/" + n + ".yaml" }
+
+func TestPathRejectsUnsafeNames(t *testing.T) {
+	tempHome(t)
+	for _, name := range []string{"../escaped", "sub/dir", "..", "."} {
+		if err := Save(&Group{Name: name, Members: []string{"x"}}); err == nil {
+			t.Errorf("Save(%q): expected rejection, got nil", name)
+		}
+		if _, err := Load(name); err == nil {
+			t.Errorf("Load(%q): expected rejection, got nil", name)
+		}
+	}
+}

@@ -57,6 +57,9 @@ func Dir() (string, error) {
 }
 
 func path(name string) (string, error) {
+	if name == "" || name == "." || name == ".." || strings.ContainsAny(name, "/\\") {
+		return "", fmt.Errorf("invalid group name %q", name)
+	}
 	d, err := Dir()
 	if err != nil {
 		return "", err
