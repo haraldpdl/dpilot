@@ -13,16 +13,10 @@ archives:
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
 checksum:
   name_template: checksums.txt
-brews:
+homebrew_casks:
   - repository:
       owner: haraldpdl
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    directory: Formula
     homepage: https://github.com/haraldpdl/dpilot
     description: Orchestrate ordered groups of ddev projects
-    license: MIT
-    install: |
-      bin.install "dpilot"
-    test: |
-      system "#{bin}/dpilot", "version"

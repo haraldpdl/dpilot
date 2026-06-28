@@ -25,7 +25,7 @@ The dashboard (run `dpilot` with no arguments) and the interactive group editor 
 
 ## Install
 
-**Homebrew** (macOS and Linux):
+**Homebrew** (macOS):
 
 ```bash
 brew install haraldpdl/tap/dpilot
