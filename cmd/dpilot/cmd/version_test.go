@@ -1,18 +1,21 @@
 package cmd
 
-import (
-	"bytes"
-	"testing"
-)
+import "testing"
 
-func TestVersionCommand(t *testing.T) {
-	var buf bytes.Buffer
-	rootCmd.SetOut(&buf)
-	rootCmd.SetArgs([]string{"version"})
-	if err := rootCmd.Execute(); err != nil {
-		t.Fatalf("execute: %v", err)
+func TestResolveVersionPrefersLdflags(t *testing.T) {
+	old := Version
+	defer func() { Version = old }()
+	Version = "1.2.3"
+	if got := resolveVersion(); got != "1.2.3" {
+		t.Fatalf("resolveVersion() = %q, want 1.2.3", got)
 	}
-	if !bytes.Contains(buf.Bytes(), []byte("dpilot")) {
-		t.Fatalf("expected version output to mention dpilot, got %q", buf.String())
+}
+
+func TestResolveVersionNeverEmpty(t *testing.T) {
+	old := Version
+	defer func() { Version = old }()
+	Version = "dev"
+	if got := resolveVersion(); got == "" {
+		t.Fatal("resolveVersion() returned empty")
 	}
 }
