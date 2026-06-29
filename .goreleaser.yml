@@ -20,3 +20,11 @@ homebrew_casks:
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     homepage: https://github.com/haraldpdl/dpilot
     description: Orchestrate ordered groups of ddev projects
+    # The binary is unsigned/un-notarized, so strip the download quarantine
+    # attribute on install; otherwise Gatekeeper blocks first run.
+    hooks:
+      post:
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/dpilot"]
+          end
