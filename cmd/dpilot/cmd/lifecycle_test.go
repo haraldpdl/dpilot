@@ -11,6 +11,7 @@ import (
 
 type recClient struct {
 	started, stopped []string
+	calls            []string // interleaved "start:x"/"stop:x" log, so tests can assert phase order
 }
 
 func (c *recClient) List(context.Context) ([]ddev.Project, error) { return nil, nil }
@@ -19,10 +20,12 @@ func (c *recClient) Describe(_ context.Context, name string) (*ddev.Describe, er
 }
 func (c *recClient) Start(_ context.Context, name string) error {
 	c.started = append(c.started, name)
+	c.calls = append(c.calls, "start:"+name)
 	return nil
 }
 func (c *recClient) Stop(_ context.Context, name string) error {
 	c.stopped = append(c.stopped, name)
+	c.calls = append(c.calls, "stop:"+name)
 	return nil
 }
 
@@ -54,16 +57,17 @@ func TestStopCommandStopsReverse(t *testing.T) {
 
 func TestRestartCommandStopsReverseThenStartsInOrder(t *testing.T) {
 	t.Setenv("DPILOT_HOME", t.TempDir())
-	_ = config.Save(&config.Group{Name: "g", Members: []string{"db", "api"}})
+	if err := config.Save(&config.Group{Name: "g", Members: []string{"db", "api"}}); err != nil {
+		t.Fatal(err)
+	}
 	rec := &recClient{}
+	orig := newClient
 	newClient = func() ddev.Client { return rec }
+	t.Cleanup(func() { newClient = orig })
 	if _, err := run(t, "restart", "g"); err != nil {
 		t.Fatalf("restart: %v", err)
 	}
-	if got := strings.Join(rec.stopped, ","); got != "api,db" {
-		t.Fatalf("restart must stop in reverse order first, stopped %q", got)
-	}
-	if got := strings.Join(rec.started, ","); got != "db,api" {
-		t.Fatalf("restart must then start in order, started %q", got)
+	if got := strings.Join(rec.calls, ","); got != "stop:api,stop:db,start:db,start:api" {
+		t.Fatalf("restart must stop in reverse order, then start in order; got %q", got)
 	}
 }
