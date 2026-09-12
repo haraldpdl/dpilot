@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -194,5 +196,52 @@ func TestEditorNameRejectsInvalid(t *testing.T) {
 	e = send(e, kt(tea.KeyEnter))
 	if e.errMsg == "" || e.phase != phaseName {
 		t.Fatalf("invalid name should error and stay on name phase (err=%q phase=%d)", e.errMsg, e.phase)
+	}
+}
+
+func TestEditorWindowsProjectsAroundCursorAtEveryHeight(t *testing.T) {
+	var names []string
+	for i := range 30 {
+		names = append(names, fmt.Sprintf("proj%02d", i))
+	}
+	for h := 9; h <= 30; h++ {
+		e := NewEditor(EditorOptions{Name: "g", NameFixed: true, Projects: projs(names...)})
+		e = send(e, tea.WindowSizeMsg{Width: 80, Height: h})
+		for range 25 {
+			e = send(e, kt(tea.KeyDown))
+		}
+		v := e.View()
+		if got := strings.Count(v, "\n") + 1; got > h {
+			t.Errorf("height %d: view has %d lines:\n%s", h, got, v)
+		}
+		if !strings.Contains(v, "proj25") || strings.Contains(v, "proj00") {
+			t.Errorf("height %d: list should scroll with the cursor:\n%s", h, v)
+		}
+		e.errMsg = "invalid duration"
+		if got := strings.Count(e.View(), "\n") + 1; got > h && h >= 10 {
+			t.Errorf("height %d with error: view has %d lines", h, got)
+		}
+	}
+}
+
+func TestEditorShowsOrphanMembersFirstAndLetsUserRemoveThem(t *testing.T) {
+	e := NewEditor(EditorOptions{Name: "g", NameFixed: true, Projects: projs("a", "b"), InitialMembers: []string{"a", "ghost"}})
+	v := e.View()
+	if !strings.Contains(v, "ghost") || !strings.Contains(v, "missing") {
+		t.Fatalf("a member ddev no longer lists must be shown as missing:\n%s", v)
+	}
+	if strings.Index(v, "ghost") > strings.Index(v, "[1] a") {
+		t.Fatalf("orphaned members should be listed first so they are seen:\n%s", v)
+	}
+	e = send(e, kt(tea.KeySpace)) // cursor starts on the orphan; unselect it
+	if got := e.Result().Members; len(got) != 1 || got[0] != "a" {
+		t.Fatalf("expected ghost removed, got %v", got)
+	}
+}
+
+func TestEditorEditsGroupWithOrphansWhenDdevListsNothing(t *testing.T) {
+	e := NewEditor(EditorOptions{Name: "g", NameFixed: true, Projects: nil, InitialMembers: []string{"ghost"}})
+	if e.phase != phaseSelect {
+		t.Fatalf("a group with members must be editable even when ddev lists no projects, phase=%d", e.phase)
 	}
 }

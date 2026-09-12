@@ -73,6 +73,7 @@ type Dashboard struct {
 	notice   string // action/save/delete failure; sticky until the next key press
 	describe []orchestrator.MemberState
 	editor   Editor
+	height   int // terminal rows, 0 = unknown
 	// pendingDelete is the group named in the confirm prompt, captured when
 	// the prompt opens so a concurrent refresh cannot retarget it.
 	pendingDelete string
@@ -147,6 +148,7 @@ func (d Dashboard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return d, nil
 		}
 		d.editor = NewEditor(m.opts)
+		d.editor.height = d.height // WindowSizeMsg only arrives at start and on resize
 		d.mode = modeEditor
 		return d, d.editor.Init()
 	case actionDoneMsg:
@@ -156,6 +158,10 @@ func (d Dashboard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		cmd := d.refresh()
 		return d, cmd
+	case tea.WindowSizeMsg:
+		d.height = m.Height
+		d.editor.height = m.Height
+		return d, nil
 	case tickMsg:
 		if d.mode == modeList {
 			cmd := d.refresh()
@@ -321,16 +327,20 @@ func (d Dashboard) View() string {
 		return d.editor.View()
 	}
 	if d.mode == modeDescribe {
-		return describeView(d.describe)
+		return describeView(d.describe, d.height)
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s\n\n", titleStyle.Render("dpilot groups"))
 	if len(d.rows) == 0 {
 		b.WriteString("no groups yet. press n to create one\n")
 	}
-	for i, r := range d.rows {
+	start, end, above, below := window(len(d.rows), d.cursor, d.rowBudget())
+	if above > 0 {
+		fmt.Fprintf(&b, "%s\n", dimStyle.Render(fmt.Sprintf("  … %d more above", above)))
+	}
+	for i, r := range d.rows[start:end] {
 		cursor := "  "
-		if i == d.cursor {
+		if start+i == d.cursor {
 			cursor = "> "
 		}
 		if r.Error != "" {
@@ -338,6 +348,9 @@ func (d Dashboard) View() string {
 			continue
 		}
 		fmt.Fprintf(&b, "%s%-20s  members %d  running %d\n", cursor, r.Name, r.Members, r.Running)
+	}
+	if below > 0 {
+		fmt.Fprintf(&b, "%s\n", dimStyle.Render(fmt.Sprintf("  … %d more below", below)))
 	}
 	if d.mode == modeConfirmDelete {
 		fmt.Fprintf(&b, "\ndelete %q? [y/N]", d.pendingDelete)
@@ -354,4 +367,22 @@ func (d Dashboard) View() string {
 		fmt.Fprintf(&b, "\n%s", d.notice)
 	}
 	return borderStyle.Render(b.String())
+}
+
+// rowBudget is how many terminal rows the group list may use: the height
+// minus the border, title, footer and any status lines; 0 when unknown.
+func (d Dashboard) rowBudget() int {
+	if d.height <= 0 {
+		return 0
+	}
+	fixed := 6 // border (2), title + blank, blank + footer
+	if len(d.rows) == 0 {
+		fixed++ // the "no groups yet" line
+	}
+	for _, extra := range []string{d.busy, d.err, d.notice} {
+		if extra != "" {
+			fixed++
+		}
+	}
+	return max(1, d.height-fixed)
 }
