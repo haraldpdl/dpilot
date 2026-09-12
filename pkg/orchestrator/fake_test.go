@@ -24,6 +24,9 @@ type fakeClient struct {
 	describeSeq map[string][]*ddev.Describe
 	describeIdx map[string]int
 	list        []ddev.Project
+	// calls is the interleaved "start:x"/"stop:x" log of every attempt,
+	// including ones that fail, so tests can assert phase order.
+	calls []string
 }
 
 func newFakeClient() *fakeClient {
@@ -59,6 +62,7 @@ func (f *fakeClient) Describe(_ context.Context, name string) (*ddev.Describe, e
 }
 
 func (f *fakeClient) Start(_ context.Context, name string) error {
+	f.calls = append(f.calls, "start:"+name)
 	if err := f.startErr[name]; err != nil {
 		return err
 	}
@@ -67,6 +71,7 @@ func (f *fakeClient) Start(_ context.Context, name string) error {
 }
 
 func (f *fakeClient) Stop(_ context.Context, name string) error {
+	f.calls = append(f.calls, "stop:"+name)
 	if err := f.stopErr[name]; err != nil {
 		return err
 	}
