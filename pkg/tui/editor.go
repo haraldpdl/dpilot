@@ -47,6 +47,7 @@ type Editor struct {
 	errMsg    string
 	nameInput textinput.Model
 	toInput   textinput.Model
+	width     int // terminal columns, 0 = unknown
 	height    int // terminal rows, 0 = unknown
 }
 
@@ -144,7 +145,7 @@ func (e *Editor) move(name string, delta int) {
 
 func (e Editor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if ws, ok := msg.(tea.WindowSizeMsg); ok {
-		e.height = ws.Height
+		e.width, e.height = ws.Width, ws.Height
 		return e, nil
 	}
 	key, ok := msg.(tea.KeyMsg)
@@ -290,7 +291,7 @@ func (e Editor) View() string {
 	if e.errMsg != "" {
 		fmt.Fprintf(&b, "\n%s", e.errMsg)
 	}
-	return borderStyle.Render(b.String())
+	return box(b.String(), e.width)
 }
 
 // rowBudget is how many terminal rows the project list may use: the height

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/haraldpdl/dpilot/pkg/config"
 	"github.com/haraldpdl/dpilot/pkg/ddev"
 	"github.com/haraldpdl/dpilot/pkg/orchestrator"
@@ -413,5 +414,37 @@ func TestDashboardPassesSizeToEditorAndDescribe(t *testing.T) {
 	d.mode, d.describe, d.height = modeDescribe, states, 12
 	if v := d.View(); lines(v) > 12 || !strings.Contains(v, "m00") || !strings.Contains(v, "more") {
 		t.Fatalf("describe must fit the terminal too:\n%s", v)
+	}
+}
+
+func widest(v string) int {
+	w := 0
+	for _, line := range strings.Split(v, "\n") {
+		w = max(w, lipgloss.Width(line))
+	}
+	return w
+}
+
+func TestDashboardFitsTerminalWidth(t *testing.T) {
+	rec := &recorder{}
+	long := strings.Repeat("verylonggroupname", 5)
+	rows := []GroupRow{{Name: long, Members: 3, Running: 1}, {Name: "b", Error: strings.Repeat("parse error detail ", 20)}}
+	d := seeded(NewDashboard(testLoader(rec, rows, nil)), rows)
+	d = dsend(d, tea.WindowSizeMsg{Width: 60, Height: 20})
+	d.notice = strings.Repeat("start \"g\" failed: something went wrong in docker ", 6)
+	d.err = strings.Repeat("ddev [list -j]: context deadline exceeded ", 4)
+	if w := widest(d.View()); w > 60 {
+		t.Fatalf("dashboard must not exceed the terminal width (60), widest line %d:\n%s", w, d.View())
+	}
+	d.mode = modeConfirmDelete
+	d.pendingDelete = long
+	if w := widest(d.View()); w > 60 {
+		t.Fatalf("confirm prompt must fit too, widest line %d", w)
+	}
+	var states []orchestrator.MemberState
+	states = append(states, orchestrator.MemberState{Name: long, Status: ddev.StatusRunning})
+	d.mode, d.describe = modeDescribe, states
+	if w := widest(d.View()); w > 60 {
+		t.Fatalf("describe view must fit too, widest line %d", w)
 	}
 }

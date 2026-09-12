@@ -9,7 +9,7 @@ import (
 
 // describeView renders a group's members and their live states, windowed to
 // the terminal height (0 = unknown) like the other lists.
-func describeView(states []orchestrator.MemberState, height int) string {
+func describeView(states []orchestrator.MemberState, width, height int) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s\n\n", titleStyle.Render("describe"))
 	budget := 0
@@ -27,5 +27,5 @@ func describeView(states []orchestrator.MemberState, height int) string {
 		fmt.Fprintf(&b, "%s\n", dimStyle.Render(fmt.Sprintf("  … %d more below", below)))
 	}
 	b.WriteString(dimStyle.Render("\nany key to return"))
-	return borderStyle.Render(b.String())
+	return box(b.String(), width)
 }
