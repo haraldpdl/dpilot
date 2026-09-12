@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -333,5 +334,82 @@ func TestDashboardShowsInvalidGroupRow(t *testing.T) {
 		if cmd != nil || rec.execVerb != "" || !strings.Contains(nm.(Dashboard).View(), "press D to delete") {
 			t.Fatalf("key %v on an invalid row should explain instead of acting", key)
 		}
+	}
+}
+
+func manyRows(n int) []GroupRow {
+	rows := make([]GroupRow, n)
+	for i := range rows {
+		rows[i] = GroupRow{Name: fmt.Sprintf("row%02d", i)}
+	}
+	return rows
+}
+
+func lines(v string) int { return strings.Count(v, "\n") + 1 }
+
+func TestDashboardWindowsRowsAroundCursor(t *testing.T) {
+	rec := &recorder{}
+	rows := manyRows(30)
+	d := seeded(NewDashboard(testLoader(rec, rows, nil)), rows)
+	d = dsend(d, tea.WindowSizeMsg{Width: 80, Height: 12})
+	for range 25 {
+		d = dsend(d, kt(tea.KeyDown))
+	}
+	v := d.View()
+	if !strings.Contains(v, "row25") || strings.Contains(v, "row00") || !strings.Contains(v, "more") {
+		t.Fatalf("the cursor row must stay visible, far rows scroll away, hidden rows are marked:\n%s", v)
+	}
+}
+
+func TestDashboardFitsEveryHeight(t *testing.T) {
+	rec := &recorder{}
+	rows := manyRows(30)
+	for h := 6; h <= 30; h++ {
+		for _, variant := range []string{"plain", "notice", "busy+err+notice", "confirm"} {
+			d := seeded(NewDashboard(testLoader(rec, rows, nil)), rows)
+			d = dsend(d, tea.WindowSizeMsg{Width: 80, Height: h}, kt(tea.KeyDown), kt(tea.KeyDown), kt(tea.KeyDown))
+			switch variant {
+			case "notice":
+				d.notice = "start \"g\" failed"
+			case "busy+err+notice":
+				d.busy, d.err, d.notice = "loading", "load failed", "start failed"
+			case "confirm":
+				d = dsend(d, runes("D"))
+			}
+			if got := lines(d.View()); got > h && h >= 9 {
+				t.Errorf("height %d (%s): view has %d lines", h, variant, got)
+			}
+			if !strings.Contains(d.View(), "row03") {
+				t.Errorf("height %d (%s): cursor row not visible", h, variant)
+			}
+		}
+	}
+	empty := seeded(NewDashboard(testLoader(rec, nil, nil)), nil)
+	empty = dsend(empty, tea.WindowSizeMsg{Width: 80, Height: 7})
+	if got := lines(empty.View()); got > 7 {
+		t.Errorf("empty dashboard at height 7 has %d lines", got)
+	}
+}
+
+func TestDashboardPassesSizeToEditorAndDescribe(t *testing.T) {
+	rec := &recorder{}
+	d := seeded(NewDashboard(testLoader(rec, nil, projs("db"))), nil)
+	d = dsend(d, tea.WindowSizeMsg{Width: 80, Height: 10})
+	nm, cmd := d.Update(runes("n"))
+	d = runCmd(nm.(Dashboard), cmd)
+	if d.mode != modeEditor || d.editor.height != 10 {
+		t.Fatalf("editor opened later must learn the current size: mode=%v height=%d", d.mode, d.editor.height)
+	}
+	d = dsend(d, tea.WindowSizeMsg{Width: 80, Height: 14})
+	if d.editor.height != 14 {
+		t.Fatal("a resize while the editor is open must reach it")
+	}
+	var states []orchestrator.MemberState
+	for i := range 30 {
+		states = append(states, orchestrator.MemberState{Name: fmt.Sprintf("m%02d", i), Status: ddev.StatusRunning})
+	}
+	d.mode, d.describe, d.height = modeDescribe, states, 12
+	if v := d.View(); lines(v) > 12 || !strings.Contains(v, "m00") || !strings.Contains(v, "more") {
+		t.Fatalf("describe must fit the terminal too:\n%s", v)
 	}
 }

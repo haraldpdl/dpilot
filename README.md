@@ -141,7 +141,8 @@ Run `dpilot create <group>` in a terminal to open the group editor (the same
 picker reached from the dashboard's `n` and `e`):
 
 - Move with the arrow keys; `space` adds or removes the highlighted ddev project.
-  Selected projects show their start-order number.
+  Selected projects show their start-order number. A member ddev no longer
+  lists is shown as `missing` so it can still be removed.
 - `K`/`J` move the highlighted selected project earlier or later in the order.
 - `t` edits the readiness wait_timeout.
 - `enter` saves, `esc` cancels (`ctrl-c` quits dpilot from anywhere).

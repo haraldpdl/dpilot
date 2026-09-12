@@ -33,8 +33,12 @@ type EditorOptions struct {
 
 // Editor is the bubbletea model for creating or editing a group.
 type Editor struct {
-	opts      EditorOptions
-	phase     editorPhase
+	opts  EditorOptions
+	phase editorPhase
+	// rows is what the picker shows: every project ddev lists, plus any
+	// current member ddev no longer knows (marked missing) so it can still be
+	// seen, reordered and removed.
+	rows      []ddev.Project
 	name      string
 	cursor    int
 	order     []string
@@ -43,6 +47,7 @@ type Editor struct {
 	errMsg    string
 	nameInput textinput.Model
 	toInput   textinput.Model
+	height    int // terminal rows, 0 = unknown
 }
 
 // NewEditor builds an Editor. It starts at the name phase only when the name is
@@ -59,13 +64,14 @@ func NewEditor(opts EditorOptions) Editor {
 	ti.SetValue(to.String())
 	e := Editor{
 		opts:      opts,
+		rows:      pickerRows(opts.Projects, opts.InitialMembers),
 		name:      opts.Name,
 		order:     append([]string(nil), opts.InitialMembers...),
 		timeout:   to,
 		nameInput: ni,
 		toInput:   ti,
 	}
-	if len(opts.Projects) == 0 {
+	if len(e.rows) == 0 {
 		e.phase = phaseNoProjects
 	} else if !opts.NameFixed && opts.Name == "" {
 		e.phase = phaseName
@@ -77,6 +83,21 @@ func NewEditor(opts EditorOptions) Editor {
 }
 
 func (e Editor) Init() tea.Cmd { return textinput.Blink }
+
+func pickerRows(projects []ddev.Project, members []string) []ddev.Project {
+	rows := append([]ddev.Project(nil), projects...)
+	known := map[string]bool{}
+	for _, p := range projects {
+		known[p.Name] = true
+	}
+	for _, m := range members {
+		if !known[m] {
+			rows = append(rows, ddev.Project{Name: m, Status: ddev.StatusMissing})
+			known[m] = true
+		}
+	}
+	return rows
+}
 
 func (e Editor) orderOf(name string) int {
 	for i, n := range e.order {
@@ -120,6 +141,10 @@ func (e *Editor) move(name string, delta int) {
 }
 
 func (e Editor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if ws, ok := msg.(tea.WindowSizeMsg); ok {
+		e.height = ws.Height
+		return e, nil
+	}
 	key, ok := msg.(tea.KeyMsg)
 	if !ok {
 		switch e.phase {
@@ -194,20 +219,20 @@ func (e Editor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				e.cursor--
 			}
 		case key.Type == tea.KeyDown || keyRune(key, 'j'):
-			if e.cursor < len(e.opts.Projects)-1 {
+			if e.cursor < len(e.rows)-1 {
 				e.cursor++
 			}
 		case key.Type == tea.KeySpace:
-			if len(e.opts.Projects) > 0 {
-				e.toggle(e.opts.Projects[e.cursor].Name)
+			if len(e.rows) > 0 {
+				e.toggle(e.rows[e.cursor].Name)
 			}
 		case keyRune(key, 'K'):
-			if len(e.opts.Projects) > 0 {
-				e.move(e.opts.Projects[e.cursor].Name, -1)
+			if len(e.rows) > 0 {
+				e.move(e.rows[e.cursor].Name, -1)
 			}
 		case keyRune(key, 'J'):
-			if len(e.opts.Projects) > 0 {
-				e.move(e.opts.Projects[e.cursor].Name, 1)
+			if len(e.rows) > 0 {
+				e.move(e.rows[e.cursor].Name, 1)
 			}
 		case keyRune(key, 't'):
 			e.toInput.SetValue(e.timeout.String())
@@ -239,9 +264,13 @@ func (e Editor) View() string {
 		b.WriteString("No ddev projects found. Press any key to exit.\n")
 	default:
 		fmt.Fprintf(&b, "%s\n\n", titleStyle.Render("Select projects for "+e.name))
-		for i, p := range e.opts.Projects {
+		start, end, above, below := window(len(e.rows), e.cursor, e.rowBudget())
+		if above > 0 {
+			fmt.Fprintf(&b, "%s\n", dimStyle.Render(fmt.Sprintf("  … %d more above", above)))
+		}
+		for i, p := range e.rows[start:end] {
 			cursor := "  "
-			if i == e.cursor {
+			if start+i == e.cursor {
 				cursor = "> "
 			}
 			mark := "[ ]"
@@ -250,6 +279,9 @@ func (e Editor) View() string {
 			}
 			fmt.Fprintf(&b, "%s%s %-20s %s\n", cursor, mark, p.Name, statusColor(string(p.Status)))
 		}
+		if below > 0 {
+			fmt.Fprintf(&b, "%s\n", dimStyle.Render(fmt.Sprintf("  … %d more below", below)))
+		}
 		fmt.Fprintf(&b, "\nwait_timeout: %s\n", e.timeout)
 		b.WriteString(dimStyle.Render("\nspace add/remove · K/J reorder · t timeout · enter save · esc cancel"))
 	}
@@ -257,6 +289,19 @@ func (e Editor) View() string {
 		fmt.Fprintf(&b, "\n%s", e.errMsg)
 	}
 	return borderStyle.Render(b.String())
+}
+
+// rowBudget is how many terminal rows the project list may use: the height
+// minus the border, title, timeout line, footer and any error; 0 when unknown.
+func (e Editor) rowBudget() int {
+	if e.height <= 0 {
+		return 0
+	}
+	fixed := 8 // border (2), title + blank, blank + wait_timeout, blank + footer
+	if e.errMsg != "" {
+		fixed++
+	}
+	return max(1, e.height-fixed)
 }
 
 // Done reports whether the editor has finished (saved or canceled).
