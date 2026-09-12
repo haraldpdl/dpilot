@@ -13,10 +13,17 @@ func TestGroupsJSON(t *testing.T) {
 	if err := Groups(&buf, rows, true); err != nil {
 		t.Fatal(err)
 	}
-	var got []GroupRow
-	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+	var e struct {
+		Level, Msg, Time string
+		Raw              []GroupRow
+	}
+	if err := json.Unmarshal(buf.Bytes(), &e); err != nil {
 		t.Fatalf("not valid json: %v", err)
 	}
+	if e.Level != "info" || e.Time == "" || !strings.Contains(e.Msg, "mystack") {
+		t.Fatalf("expected a ddev-style envelope, got %s", buf.String())
+	}
+	got := e.Raw
 	if got[0].Name != "mystack" || got[0].Running != 2 {
 		t.Fatalf("unexpected: %+v", got)
 	}
@@ -50,13 +57,16 @@ func TestDescribeJSON(t *testing.T) {
 	if err := Describe(&buf, "mystack", rows, true); err != nil {
 		t.Fatal(err)
 	}
-	var got struct {
-		Name    string      `json:"name"`
-		Members []MemberRow `json:"members"`
+	var e struct {
+		Raw struct {
+			Name    string      `json:"name"`
+			Members []MemberRow `json:"members"`
+		} `json:"raw"`
 	}
-	if err := json.Unmarshal(buf.Bytes(), &got); err != nil {
+	if err := json.Unmarshal(buf.Bytes(), &e); err != nil {
 		t.Fatalf("describe json invalid: %v", err)
 	}
+	got := e.Raw
 	if got.Name != "mystack" || len(got.Members) != 2 || got.Members[1].Name != "api" || got.Members[1].Status != "missing" {
 		t.Fatalf("unexpected describe json: %+v", got)
 	}
@@ -89,8 +99,9 @@ func TestGroupsEmptyJSONIsArray(t *testing.T) {
 	if err := Groups(&buf, nil, true); err != nil {
 		t.Fatal(err)
 	}
-	if strings.TrimSpace(buf.String()) != "[]" {
-		t.Fatalf("empty -j output must be [], got %q", buf.String())
+	var e struct{ Raw json.RawMessage }
+	if err := json.Unmarshal(buf.Bytes(), &e); err != nil || strings.TrimSpace(string(e.Raw)) != "[]" {
+		t.Fatalf("empty -j raw must be [], got %q", buf.String())
 	}
 }
 
@@ -108,8 +119,9 @@ func TestGroupsInvalidRowShowsError(t *testing.T) {
 	if err := Groups(&buf, rows, true); err != nil {
 		t.Fatal(err)
 	}
-	var got []GroupRow
-	if err := json.Unmarshal(buf.Bytes(), &got); err != nil || got[0].Error == "" || got[1].Error != "" {
+	var e struct{ Raw []GroupRow }
+	got, err := e.Raw, json.Unmarshal(buf.Bytes(), &e)
+	if err != nil || len(got) != 2 || got[0].Error == "" || got[1].Error != "" {
 		t.Fatalf("json should carry error only on the broken row: %s (%v)", buf.String(), err)
 	}
 }

@@ -1,23 +1,33 @@
 package cmd
 
 import (
-	"github.com/haraldpdl/dpilot/pkg/config"
+	"errors"
+
 	"github.com/spf13/cobra"
 )
 
 var stopCmd = &cobra.Command{
-	Use:   "stop <group>",
+	Use:   "stop [group]",
 	Short: "Stop all projects in a group, in reverse order",
-	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		g, err := config.Load(args[0])
+		groups, err := groupsFor(cmd, args)
 		if err != nil {
 			return err
 		}
 		ctx, stop := signalCtx()
 		defer stop()
-		return orch(cmd).Stop(ctx, g)
+		o := orch(cmd)
+		var errs []error
+		for i := len(groups) - 1; i >= 0; i-- { // --all stops groups in reverse name order
+			if err := o.Stop(ctx, groups[i]); err != nil {
+				errs = append(errs, err)
+			}
+		}
+		return errors.Join(errs...)
 	},
 }
 
-func init() { rootCmd.AddCommand(stopCmd) }
+func init() {
+	lifecycleArgs(stopCmd)
+	rootCmd.AddCommand(stopCmd)
+}

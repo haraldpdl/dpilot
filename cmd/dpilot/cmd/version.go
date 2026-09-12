@@ -34,4 +34,7 @@ func resolveVersion() string {
 
 func init() {
 	rootCmd.AddCommand(versionCmd)
+	// Also serve --version / -v like ddev, with the same text as `dpilot version`.
+	rootCmd.Version = resolveVersion()
+	rootCmd.SetVersionTemplate("dpilot {{.Version}}\n")
 }

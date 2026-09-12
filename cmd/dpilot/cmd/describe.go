@@ -11,11 +11,11 @@ import (
 
 var describeCmd = &cobra.Command{
 	Use:     "describe <group>",
-	Aliases: []string{"status"},
+	Aliases: []string{"status", "st", "desc"},
 	Short:   "Show a group's members and their live ddev state",
 	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		jsonOut, _ := cmd.Flags().GetBool("json-output")
+		jsonOut := jsonOutput()
 		g, err := config.Load(args[0])
 		if err != nil {
 			return err
@@ -32,7 +32,4 @@ var describeCmd = &cobra.Command{
 	},
 }
 
-func init() {
-	describeCmd.Flags().BoolP("json-output", "j", false, "output as JSON")
-	rootCmd.AddCommand(describeCmd)
-}
+func init() { rootCmd.AddCommand(describeCmd) }

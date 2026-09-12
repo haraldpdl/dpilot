@@ -1,23 +1,30 @@
 package cmd
 
 import (
-	"github.com/haraldpdl/dpilot/pkg/config"
 	"github.com/spf13/cobra"
 )
 
 var restartCmd = &cobra.Command{
-	Use:   "restart <group>",
+	Use:   "restart [group]",
 	Short: "Stop then start all projects in a group",
-	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		g, err := config.Load(args[0])
+		groups, err := groupsFor(cmd, args)
 		if err != nil {
 			return err
 		}
 		ctx, stop := signalCtx()
 		defer stop()
-		return orch(cmd).Restart(ctx, g)
+		o := orch(cmd)
+		for _, g := range groups {
+			if err := o.Restart(ctx, g); err != nil {
+				return err
+			}
+		}
+		return nil
 	},
 }
 
-func init() { rootCmd.AddCommand(restartCmd) }
+func init() {
+	lifecycleArgs(restartCmd)
+	rootCmd.AddCommand(restartCmd)
+}
