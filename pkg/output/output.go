@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/mattn/go-isatty"
 )
 
@@ -73,6 +74,12 @@ func Groups(w io.Writer, rows []GroupRow, jsonOut bool) error {
 	t := table.NewWriter()
 	t.SetOutputMirror(w)
 	t.AppendHeader(table.Row{"GROUP", "MEMBERS", "RUNNING"})
+	// Pin the numeric columns: an "invalid" cell would otherwise flip
+	// go-pretty's content-based alignment for every row.
+	t.SetColumnConfigs([]table.ColumnConfig{
+		{Name: "MEMBERS", Align: text.AlignRight},
+		{Name: "RUNNING", Align: text.AlignRight},
+	})
 	var invalid []GroupRow
 	for _, r := range rows {
 		if r.Error != "" {
@@ -83,8 +90,8 @@ func Groups(w io.Writer, rows []GroupRow, jsonOut bool) error {
 		t.AppendRow(table.Row{r.Name, r.Members, r.Running})
 	}
 	t.Render()
-	for _, r := range invalid {
-		if _, err := fmt.Fprintf(w, "%s: %s\n", r.Name, r.Error); err != nil {
+	for _, r := range invalid { // every load error already names its group
+		if _, err := fmt.Fprintln(w, r.Error); err != nil {
 			return err
 		}
 	}

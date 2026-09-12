@@ -176,6 +176,14 @@ func (d Dashboard) handleKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (d Dashboard) handleListKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// A group whose file will not load cannot be started, described or
+	// edited; say so instead of shelling out to a command that fails.
+	if len(d.rows) > 0 && d.rows[d.cursor].Error != "" {
+		if k.Type == tea.KeyEnter || keyRune(k, 's') || keyRune(k, 'x') || keyRune(k, 'r') || keyRune(k, 'e') {
+			d.err = "group file is invalid: press D to delete it, or fix ~/.dpilot/groups/" + d.rows[d.cursor].Name + ".yaml"
+			return d, nil
+		}
+	}
 	switch {
 	case k.Type == tea.KeyUp || keyRune(k, 'k'):
 		if d.cursor > 0 {
@@ -274,7 +282,7 @@ func (d Dashboard) View() string {
 			cursor = "> "
 		}
 		if r.Error != "" {
-			fmt.Fprintf(&b, "%s%-20s  invalid: %s\n", cursor, r.Name, r.Error)
+			fmt.Fprintf(&b, "%s%-20s  invalid: %s\n", cursor, r.Name, shortError(r.Name, r.Error))
 			continue
 		}
 		fmt.Fprintf(&b, "%s%-20s  members %d  running %d\n", cursor, r.Name, r.Members, r.Running)
@@ -285,7 +293,7 @@ func (d Dashboard) View() string {
 		b.WriteString(dimStyle.Render("\n[s]tart [x]stop [r]estart [enter]describe [n]ew [e]dit [D]elete [q]uit"))
 	}
 	if d.err != "" {
-		fmt.Fprintf(&b, "\n%s", d.err)
+		fmt.Fprintf(&b, "\n%s", oneLine(d.err))
 	}
 	return borderStyle.Render(b.String())
 }

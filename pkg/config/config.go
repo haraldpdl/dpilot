@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -138,6 +139,9 @@ func Load(name string) (*Group, error) {
 	dec.KnownFields(true)
 	var g Group
 	if err := dec.Decode(&g); err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil, fmt.Errorf("group %q: file is empty", name)
+		}
 		return nil, fmt.Errorf("parse group %q: %w", name, err)
 	}
 	// The filename is the group's identity; a stale name: inside a copied or
@@ -224,8 +228,8 @@ func List() ([]string, error) {
 		if e.IsDir() {
 			continue
 		}
-		if strings.HasSuffix(e.Name(), ".yaml") {
-			names = append(names, strings.TrimSuffix(e.Name(), ".yaml"))
+		if n := strings.TrimSuffix(e.Name(), ".yaml"); n != e.Name() && n != "" {
+			names = append(names, n)
 		}
 	}
 	sort.Strings(names)

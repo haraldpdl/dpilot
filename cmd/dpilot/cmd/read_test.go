@@ -97,15 +97,22 @@ func TestListJSON(t *testing.T) {
 
 func TestListSurvivesBrokenGroupFile(t *testing.T) {
 	t.Setenv("DPILOT_HOME", t.TempDir())
-	_ = config.Save(&config.Group{Name: "good", Members: []string{"db"}})
+	if err := config.Save(&config.Group{Name: "good", Members: []string{"db"}}); err != nil {
+		t.Fatal(err)
+	}
 	dir, _ := config.Dir()
-	_ = os.WriteFile(dir+"/broken.yaml", []byte("bogus: 1\n"), 0o644)
-	newClient = func() ddev.Client { return listClient{} }
+	if err := os.WriteFile(dir+"/broken.yaml", []byte("bogus: 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	newClient = func() ddev.Client { return listClient{list: []ddev.Project{{Name: "db", Status: ddev.StatusRunning}}} }
 	out, err := run(t, "list")
 	if err != nil {
 		t.Fatalf("list must not fail because of one broken file: %v", err)
 	}
-	if !strings.Contains(out, "good") || !strings.Contains(out, "broken") {
-		t.Fatalf("both groups should be listed: %q", out)
+	if !strings.Contains(out, "good") || !strings.Contains(out, "broken") || !strings.Contains(out, "invalid") {
+		t.Fatalf("both groups should be listed, the broken one marked invalid: %q", out)
+	}
+	if !strings.Contains(out, "|       1 |       1 |") {
+		t.Fatalf("the good group's counts should still render: %q", out)
 	}
 }

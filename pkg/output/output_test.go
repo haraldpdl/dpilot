@@ -104,6 +104,12 @@ func TestGroupsInvalidRowShowsError(t *testing.T) {
 	if !strings.Contains(out, "broken") || !strings.Contains(out, "invalid") || !strings.Contains(out, "field bogus not found") {
 		t.Fatalf("invalid group should be listed with its error: %q", out)
 	}
+	if !strings.Contains(out, "|       1 |") {
+		t.Fatalf("numeric columns must stay right-aligned next to an invalid row: %q", out)
+	}
+	if strings.Count(out, "broken") != 2 { // once in the table, once in the error line
+		t.Fatalf("the group name should not be repeated in the error line: %q", out)
+	}
 	buf.Reset()
 	if err := Groups(&buf, rows, true); err != nil {
 		t.Fatal(err)
