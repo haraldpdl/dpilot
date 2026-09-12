@@ -6,22 +6,33 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/haraldpdl/dpilot/pkg/config"
 	"github.com/haraldpdl/dpilot/pkg/ddev"
 )
 
-// Clock is the time seam (mockable in tests).
+// Clock is the time seam (mockable in tests). Sleep returns early with the
+// context's error when the context is cancelled.
 type Clock interface {
 	Now() time.Time
-	Sleep(time.Duration)
+	Sleep(ctx context.Context, d time.Duration) error
 }
 
 type realClock struct{}
 
-func (realClock) Now() time.Time        { return time.Now() }
-func (realClock) Sleep(d time.Duration) { time.Sleep(d) }
+func (realClock) Now() time.Time { return time.Now() }
+func (realClock) Sleep(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
 
 // Orchestrator sequences ddev project lifecycle for a group.
 type Orchestrator struct {
@@ -36,12 +47,19 @@ func New(c ddev.Client) *Orchestrator {
 	return &Orchestrator{Client: c, Clock: realClock{}, Poll: 2 * time.Second, Out: os.Stdout}
 }
 
-// Start starts members in order, waiting for each to be ready. Fail-fast.
+// Start starts members in order, waiting for each to be ready. Fail-fast, and
+// it stops as soon as ctx is cancelled (Ctrl-C) rather than driving ddev on.
 func (o *Orchestrator) Start(ctx context.Context, g *config.Group) error {
 	n := len(g.Members)
 	for i, m := range g.Members {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("aborted before starting %s: %w", m, err)
+		}
 		fmt.Fprintf(o.Out, "Starting %s (%d/%d)...\n", m, i+1, n)
 		if err := o.Client.Start(ctx, m); err != nil {
+			if cerr := ctx.Err(); cerr != nil {
+				return fmt.Errorf("aborted while starting %s: %w", m, cerr)
+			}
 			return fmt.Errorf("start %s: %w", m, err)
 		}
 		if err := o.waitReady(ctx, m, g.WaitTimeout.Duration()); err != nil {
@@ -55,8 +73,14 @@ func (o *Orchestrator) Start(ctx context.Context, g *config.Group) error {
 func (o *Orchestrator) waitReady(ctx context.Context, name string, timeout time.Duration) error {
 	deadline := o.Clock.Now().Add(timeout)
 	for {
+		if err := ctx.Err(); err != nil {
+			return fmt.Errorf("aborted while waiting for %s: %w", name, err)
+		}
 		d, err := o.Client.Describe(ctx, name)
 		if err != nil {
+			if cerr := ctx.Err(); cerr != nil {
+				return fmt.Errorf("aborted while waiting for %s: %w", name, cerr)
+			}
 			return fmt.Errorf("describe %s: %w", name, err)
 		}
 		if d.Ready() {
@@ -65,27 +89,49 @@ func (o *Orchestrator) waitReady(ctx context.Context, name string, timeout time.
 		if !o.Clock.Now().Before(deadline) {
 			return fmt.Errorf("timeout waiting for %s to become ready after %s", name, timeout)
 		}
-		o.Clock.Sleep(o.Poll)
+		if err := o.Clock.Sleep(ctx, o.Poll); err != nil {
+			return fmt.Errorf("aborted while waiting for %s: %w", name, err)
+		}
 	}
 }
 
-// Stop stops members in reverse order, best-effort, joining any errors.
+// Stop stops members in reverse order, best-effort, joining any errors. Once
+// ctx is cancelled it reports the members left running and returns a single
+// cancellation error instead of one failure per remaining member.
 func (o *Orchestrator) Stop(ctx context.Context, g *config.Group) error {
 	var errs []error
 	for i := len(g.Members) - 1; i >= 0; i-- {
+		if err := ctx.Err(); err != nil {
+			left := g.Members[:i+1]
+			fmt.Fprintf(o.Out, "aborted: %d member(s) not stopped (%s)\n", len(left), strings.Join(reversed(left), ", "))
+			errs = append(errs, fmt.Errorf("aborted: %d member(s) not stopped: %w", len(left), err))
+			break
+		}
 		m := g.Members[i]
 		fmt.Fprintf(o.Out, "Stopping %s...\n", m)
-		if err := o.Client.Stop(ctx, m); err != nil {
+		if err := o.Client.Stop(ctx, m); err != nil && ctx.Err() == nil {
 			errs = append(errs, fmt.Errorf("stop %s: %w", m, err))
 		}
 	}
 	return errors.Join(errs...)
 }
 
+func reversed(s []string) []string {
+	out := make([]string, len(s))
+	for i, v := range s {
+		out[len(s)-1-i] = v
+	}
+	return out
+}
+
 // Restart stops (best-effort) then starts (fail-fast). A stop error never
-// blocks the start; it is reported and start proceeds.
+// blocks the start; it is reported and start proceeds. A cancelled stop does
+// block it: nothing is started after Ctrl-C.
 func (o *Orchestrator) Restart(ctx context.Context, g *config.Group) error {
 	if err := o.Stop(ctx, g); err != nil {
+		if ctx.Err() != nil {
+			return err
+		}
 		fmt.Fprintf(o.Out, "restart: stop reported errors, continuing to start: %v\n", err)
 	}
 	return o.Start(ctx, g)

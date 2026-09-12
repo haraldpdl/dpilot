@@ -11,8 +11,11 @@ import (
 // fakeClock advances deterministically: every Sleep moves Now forward.
 type fakeClock struct{ t time.Time }
 
-func (c *fakeClock) Now() time.Time        { return c.t }
-func (c *fakeClock) Sleep(d time.Duration) { c.t = c.t.Add(d) }
+func (c *fakeClock) Now() time.Time { return c.t }
+func (c *fakeClock) Sleep(ctx context.Context, d time.Duration) error {
+	c.t = c.t.Add(d)
+	return ctx.Err()
+}
 
 // fakeClient scripts ddev behavior for tests.
 type fakeClient struct {
@@ -27,6 +30,9 @@ type fakeClient struct {
 	// calls is the interleaved "start:x"/"stop:x" log of every attempt,
 	// including ones that fail, so tests can assert phase order.
 	calls []string
+	// hook, when set, runs before every Start/Stop with the member name;
+	// tests use it to cancel a context mid-run.
+	hook func(name string)
 }
 
 func newFakeClient() *fakeClient {
@@ -63,6 +69,9 @@ func (f *fakeClient) Describe(_ context.Context, name string) (*ddev.Describe, e
 
 func (f *fakeClient) Start(_ context.Context, name string) error {
 	f.calls = append(f.calls, "start:"+name)
+	if f.hook != nil {
+		f.hook(name)
+	}
 	if err := f.startErr[name]; err != nil {
 		return err
 	}
@@ -72,6 +81,9 @@ func (f *fakeClient) Start(_ context.Context, name string) error {
 
 func (f *fakeClient) Stop(_ context.Context, name string) error {
 	f.calls = append(f.calls, "stop:"+name)
+	if f.hook != nil {
+		f.hook(name)
+	}
 	if err := f.stopErr[name]; err != nil {
 		return err
 	}
