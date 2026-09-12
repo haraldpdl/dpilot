@@ -1,6 +1,7 @@
 # Quality gates. `make ci` is exactly what GitHub Actions runs; `make hooks`
 # wires the same gates into this clone (pre-commit: quick, pre-push: ci).
 GO ?= go
+GOFMT := $(shell $(GO) env GOROOT)/bin/gofmt
 STATICCHECK := honnef.co/go/tools/cmd/staticcheck@2026.2.1
 GOVULNCHECK := golang.org/x/vuln/cmd/govulncheck@v1.8.0
 TESTFLAGS ?=
@@ -12,10 +13,10 @@ ci: fmt-check vet lint tidy-check test build cross vuln
 quick: fmt-check vet
 
 fmt:
-	gofmt -w .
+	$(GOFMT) -w .
 
 fmt-check:
-	@out="$$(gofmt -l .)"; if [ -n "$$out" ]; then echo "gofmt needed on:"; echo "$$out"; exit 1; fi
+	@set -e; out="$$($(GOFMT) -l .)"; if [ -n "$$out" ]; then echo "gofmt needed on:"; echo "$$out"; exit 1; fi
 
 vet:
 	$(GO) vet ./...
@@ -32,11 +33,12 @@ test:
 build:
 	$(GO) build ./...
 
-# Every goreleaser target must at least compile.
+# Every goreleaser target must at least compile, with CGO off as in the release.
 cross:
-	GOOS=linux GOARCH=arm64 $(GO) build -o /dev/null ./cmd/dpilot
-	GOOS=darwin GOARCH=amd64 $(GO) build -o /dev/null ./cmd/dpilot
-	GOOS=darwin GOARCH=arm64 $(GO) build -o /dev/null ./cmd/dpilot
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build -o /dev/null ./cmd/dpilot
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 $(GO) build -o /dev/null ./cmd/dpilot
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(GO) build -o /dev/null ./cmd/dpilot
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(GO) build -o /dev/null ./cmd/dpilot
 
 vuln:
 	$(GO) run $(GOVULNCHECK) ./...

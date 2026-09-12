@@ -90,10 +90,15 @@ Member order is the list order in the YAML. To reorder an existing member, use
 
 ## Development
 
-`make ci` runs the same gates as GitHub Actions (gofmt, go vet, staticcheck,
-`go mod tidy` drift, tests, build, cross-compile of every release target,
-govulncheck). `make hooks` installs git hooks in this clone that run the fast
-subset before each commit and the full set before each push.
+`make ci` runs the same gates as GitHub Actions: gofmt, go vet, staticcheck,
+`go mod tidy` drift, tests, build, a cross-compile of every release target and
+govulncheck (CI additionally runs the tests with `-race`; `make ci
+TESTFLAGS=-race` reproduces that). CI builds with the Go major in
+`.go-version`; go.mod sets the language floor. `make hooks` points this clone's
+`core.hooksPath` at `.githooks`, so the fast subset runs before each commit and
+the full set before each push. The hooks check the working tree, not only the
+staged changes, and any branch you check out afterwards supplies its own
+`.githooks` scripts. `make integration` runs the ddev-backed tests below.
 
 ## Integration tests
 
