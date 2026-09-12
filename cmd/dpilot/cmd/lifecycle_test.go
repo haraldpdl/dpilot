@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/haraldpdl/dpilot/pkg/config"
@@ -48,5 +49,21 @@ func TestStopCommandStopsReverse(t *testing.T) {
 	}
 	if len(rec.stopped) != 2 || rec.stopped[0] != "api" || rec.stopped[1] != "db" {
 		t.Fatalf("unexpected stop order: %v", rec.stopped)
+	}
+}
+
+func TestRestartCommandStopsReverseThenStartsInOrder(t *testing.T) {
+	t.Setenv("DPILOT_HOME", t.TempDir())
+	_ = config.Save(&config.Group{Name: "g", Members: []string{"db", "api"}})
+	rec := &recClient{}
+	newClient = func() ddev.Client { return rec }
+	if _, err := run(t, "restart", "g"); err != nil {
+		t.Fatalf("restart: %v", err)
+	}
+	if got := strings.Join(rec.stopped, ","); got != "api,db" {
+		t.Fatalf("restart must stop in reverse order first, stopped %q", got)
+	}
+	if got := strings.Join(rec.started, ","); got != "db,api" {
+		t.Fatalf("restart must then start in order, started %q", got)
 	}
 }

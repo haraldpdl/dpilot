@@ -98,4 +98,7 @@ func TestRestartStartsEvenIfStopErrors(t *testing.T) {
 	if strings.Join(f.started, ",") != "db,api" {
 		t.Fatalf("expected restart to start db,api despite a stop error, got %v", f.started)
 	}
+	if strings.Join(f.stopped, ",") != "db" {
+		t.Fatalf("expected restart to attempt every stop first (api fails, db succeeds), stopped %v", f.stopped)
+	}
 }
