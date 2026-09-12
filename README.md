@@ -135,7 +135,7 @@ view of your groups:
   then the dashboard returns and refreshes the running counts.
 - `enter` describe the selected group (members and live state).
 - `n` create a new group, `e` edit the selected group, `D` delete it.
-- `q` quit.
+- `q` or `ctrl-c` quit.
 
 Run `dpilot create <group>` in a terminal to open the group editor (the same
 picker reached from the dashboard's `n` and `e`):
@@ -144,7 +144,7 @@ picker reached from the dashboard's `n` and `e`):
   Selected projects show their start-order number.
 - `K`/`J` move the highlighted selected project earlier or later in the order.
 - `t` edits the readiness wait_timeout.
-- `enter` saves, `esc` cancels.
+- `enter` saves, `esc` cancels (`ctrl-c` quits dpilot from anywhere).
 
 When stdin or stdout is not a terminal (scripts, CI, pipes), dpilot stays
 non-interactive: bare `dpilot` prints help, and `dpilot create <group>` makes an

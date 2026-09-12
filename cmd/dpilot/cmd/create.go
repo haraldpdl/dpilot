@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/haraldpdl/dpilot/pkg/config"
 	"github.com/haraldpdl/dpilot/pkg/tui"
@@ -35,7 +36,9 @@ var createCmd = &cobra.Command{
 			cmd.Printf("created group %q\n", name)
 			return nil
 		}
-		projects, err := newClient().List(context.Background())
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		projects, err := newClient().List(ctx)
 		if err != nil {
 			return err
 		}

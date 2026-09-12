@@ -170,6 +170,24 @@ func TestEditorNoProjectsExits(t *testing.T) {
 	}
 }
 
+func TestEditorCtrlCCancelsInEveryPhase(t *testing.T) {
+	cases := map[string]Editor{
+		"select":  NewEditor(EditorOptions{Name: "g", NameFixed: true, Projects: projs("a")}),
+		"name":    NewEditor(EditorOptions{Projects: projs("a")}),
+		"timeout": send(NewEditor(EditorOptions{Name: "g", NameFixed: true, Projects: projs("a")}), runes("t")),
+	}
+	for phase, e := range cases {
+		nm, cmd := e.Update(kt(tea.KeyCtrlC))
+		e = nm.(Editor)
+		if !e.Done() || e.Saved() {
+			t.Fatalf("%s phase: ctrl+c should cancel (done=%v saved=%v)", phase, e.Done(), e.Saved())
+		}
+		if cmd == nil {
+			t.Fatalf("%s phase: ctrl+c should return the quit command", phase)
+		}
+	}
+}
+
 func TestEditorNameRejectsInvalid(t *testing.T) {
 	e := NewEditor(EditorOptions{Projects: projs("a")})
 	e.nameInput.SetValue("-x")
