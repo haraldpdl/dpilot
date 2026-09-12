@@ -79,11 +79,20 @@ dpilot's command vocabulary mirrors ddev so the two feel like one toolset.
 | `-y, --yes` | `delete` | Skip the confirmation prompt. |
 | `--after <member>` | `add` | Insert the new member after `<member>` instead of appending. |
 
+### Group names and members
+
+New group names may use letters, digits, `.`, `_` and `-`, and must start with
+a letter or digit; group files created by earlier releases with looser names
+keep working. Members must be valid ddev project names; dpilot rejects any
+other value in a group file and always passes names to ddev after `--`, so a
+member can never be read as a ddev flag. The filename is the group's identity:
+the `name:` field inside the YAML is informational.
+
 ### Ordering and readiness
 
 `dpilot start` waits for each member to reach `running` state (via `ddev describe -j`)
 before starting the next. The per-member timeout defaults to 120 seconds and can be
-overridden per group with `wait_timeout` in the group YAML.
+overridden per group with `wait_timeout` in the group YAML (must be positive).
 
 Member order is the list order in the YAML. To reorder an existing member, use
 `dpilot remove` followed by `dpilot add --after`.

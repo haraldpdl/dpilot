@@ -18,10 +18,14 @@ func execAction(verb, group string) tea.Cmd {
 	if err != nil {
 		self = os.Args[0]
 	}
-	return tea.ExecProcess(exec.Command(self, verb, group), func(err error) tea.Msg {
+	return tea.ExecProcess(exec.Command(self, selfArgs(verb, group)...), func(err error) tea.Msg {
 		return actionDoneMsg{err: err}
 	})
 }
+
+// selfArgs builds the argv for re-invoking dpilot; the group name goes after
+// "--" so a legacy dash-prefixed name is never parsed as a flag.
+func selfArgs(verb, group string) []string { return []string{verb, "--", group} }
 
 // RunDashboard runs the dashboard program full-screen.
 func RunDashboard(loader Loader) error {

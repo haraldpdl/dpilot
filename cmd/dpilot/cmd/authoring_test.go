@@ -174,3 +174,16 @@ func TestRemoveRejectsAbsent(t *testing.T) {
 		t.Fatal("expected remove of absent member to error")
 	}
 }
+
+func TestCreateRejectsInvalidNames(t *testing.T) {
+	t.Setenv("DPILOT_HOME", t.TempDir())
+	withProjects("db")
+	for _, name := range []string{"-foo", "my group", ".hidden"} {
+		if _, err := run(t, "create", name); err == nil {
+			t.Errorf("create %q: expected rejection", name)
+		}
+		if ok, _ := config.Exists(name); ok {
+			t.Errorf("create %q: file must not be written", name)
+		}
+	}
+}

@@ -143,6 +143,10 @@ func (e Editor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				e.errMsg = "name cannot be empty"
 				return e, nil
 			}
+			if err := config.ValidateName(name); err != nil {
+				e.errMsg = err.Error()
+				return e, nil
+			}
 			if e.opts.NameExists != nil && e.opts.NameExists(name) {
 				e.errMsg = fmt.Sprintf("group %q already exists", name)
 				return e, nil
@@ -161,7 +165,7 @@ func (e Editor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch key.Type {
 		case tea.KeyEnter:
 			d, err := time.ParseDuration(strings.TrimSpace(e.toInput.Value()))
-			if err != nil {
+			if err != nil || d <= 0 {
 				e.errMsg = "invalid duration (try 120s, 2m)"
 				return e, nil
 			}

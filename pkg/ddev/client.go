@@ -9,7 +9,8 @@ import (
 	"os/exec"
 )
 
-// Client is the seam over the ddev CLI.
+// Client is the seam over the ddev CLI. Project names are always passed after
+// a "--" terminator so ddev can never parse a name as a flag.
 type Client interface {
 	List(ctx context.Context) ([]Project, error)
 	Describe(ctx context.Context, name string) (*Describe, error)
@@ -72,7 +73,7 @@ func (c *CLI) List(ctx context.Context) ([]Project, error) {
 }
 
 func (c *CLI) Describe(ctx context.Context, name string) (*Describe, error) {
-	out, err := c.capture(ctx, "describe", name, "-j")
+	out, err := c.capture(ctx, "describe", "-j", "--", name)
 	if err != nil {
 		return nil, err
 	}
@@ -80,9 +81,9 @@ func (c *CLI) Describe(ctx context.Context, name string) (*Describe, error) {
 }
 
 func (c *CLI) Start(ctx context.Context, name string) error {
-	return c.stream(ctx, "start", name)
+	return c.stream(ctx, "start", "--", name)
 }
 
 func (c *CLI) Stop(ctx context.Context, name string) error {
-	return c.stream(ctx, "stop", name)
+	return c.stream(ctx, "stop", "--", name)
 }
