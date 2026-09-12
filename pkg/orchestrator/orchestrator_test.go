@@ -118,8 +118,13 @@ func TestStartAbortsAfterCancellation(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected a cancellation error, got %v", err)
 	}
-	if strings.Join(f.started, ",") != "db" {
-		t.Fatalf("api must not be started after cancellation, started %v", f.started)
+	for _, name := range f.started {
+		if name == "api" {
+			t.Fatalf("api must not be started after cancellation, started %v", f.started)
+		}
+	}
+	if !strings.Contains(err.Error(), "db") {
+		t.Fatalf("the interrupted member should be named, got %v", err)
 	}
 }
 
