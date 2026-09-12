@@ -2,11 +2,13 @@ package ddev
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestCLIDdevNotFound(t *testing.T) {
@@ -53,5 +55,24 @@ func TestCLIPassesProjectNameAfterTerminator(t *testing.T) {
 	want := "start -- -RO\nstop -- -RO\ndescribe -j -- -RO\nlist -j"
 	if got != want {
 		t.Fatalf("argv mismatch\n got: %q\nwant: %q", got, want)
+	}
+}
+
+func TestCancelledCallInterruptsDdevSoItCanCleanUp(t *testing.T) {
+	c, argsFile := fakeCLI(t)
+	t.Setenv("DPILOT_HANG", "1")
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() { time.Sleep(100 * time.Millisecond); cancel() }()
+	begin := time.Now()
+	err := c.Start(ctx, "x")
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected the cancellation to surface, got %v", err)
+	}
+	if elapsed := time.Since(begin); elapsed > 3*time.Second {
+		t.Fatalf("cancelled call should return promptly, took %v", elapsed)
+	}
+	b, _ := os.ReadFile(argsFile)
+	if !strings.Contains(string(b), "INT\n") {
+		t.Fatalf("ddev must receive SIGINT (not SIGKILL) so it can clean up; log: %q", b)
 	}
 }
