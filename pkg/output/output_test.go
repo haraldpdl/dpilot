@@ -72,3 +72,50 @@ func TestDescribeNoAnsiForNonTerminal(t *testing.T) {
 		t.Fatalf("a bytes.Buffer is not a terminal; expected no ANSI: %q", buf.String())
 	}
 }
+
+func TestGroupsEmptyPrintsHintNotTable(t *testing.T) {
+	var buf bytes.Buffer
+	if err := Groups(&buf, nil, false); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "No dpilot groups found") || strings.Contains(out, "GROUP") {
+		t.Fatalf("empty list should print a hint, not a header-only table: %q", out)
+	}
+}
+
+func TestGroupsEmptyJSONIsArray(t *testing.T) {
+	var buf bytes.Buffer
+	if err := Groups(&buf, nil, true); err != nil {
+		t.Fatal(err)
+	}
+	if strings.TrimSpace(buf.String()) != "[]" {
+		t.Fatalf("empty -j output must be [], got %q", buf.String())
+	}
+}
+
+func TestGroupsInvalidRowShowsError(t *testing.T) {
+	var buf bytes.Buffer
+	rows := []GroupRow{{Name: "broken", Error: `parse group "broken": yaml: field bogus not found`}, {Name: "ok", Members: 1}}
+	if err := Groups(&buf, rows, false); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "broken") || !strings.Contains(out, "invalid") || !strings.Contains(out, "field bogus not found") {
+		t.Fatalf("invalid group should be listed with its error: %q", out)
+	}
+	if !strings.Contains(out, "|       1 |") {
+		t.Fatalf("numeric columns must stay right-aligned next to an invalid row: %q", out)
+	}
+	if strings.Count(out, "broken") != 2 { // once in the table, once in the error line
+		t.Fatalf("the group name should not be repeated in the error line: %q", out)
+	}
+	buf.Reset()
+	if err := Groups(&buf, rows, true); err != nil {
+		t.Fatal(err)
+	}
+	var got []GroupRow
+	if err := json.Unmarshal(buf.Bytes(), &got); err != nil || got[0].Error == "" || got[1].Error != "" {
+		t.Fatalf("json should carry error only on the broken row: %s (%v)", buf.String(), err)
+	}
+}

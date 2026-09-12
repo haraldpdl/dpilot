@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -112,6 +113,22 @@ func TestDashboardTickRefreshesListOnly(t *testing.T) {
 	d2 := dsend(d, tickMsg{})
 	if d2.mode != modeDescribe {
 		t.Fatal("tick must not change mode while describing")
+	}
+}
+
+func TestDashboardShowsInvalidGroupRow(t *testing.T) {
+	rec := &recorder{}
+	rows := []GroupRow{{Name: "broken", Error: "parse group \"broken\": yaml: unmarshal errors:\n  line 1: field bogus not found in type config.Group"}}
+	d := seeded(NewDashboard(testLoader(rec, rows, nil)), rows)
+	v := d.View()
+	if !strings.Contains(v, "broken") || !strings.Contains(v, "invalid: yaml: unmarshal errors: line 1: field bogus") {
+		t.Fatalf("invalid group should be visible on one row without its name repeated:\n%s", v)
+	}
+	for _, key := range []tea.KeyMsg{runes("s"), runes("x"), runes("r"), runes("e"), kt(tea.KeyEnter)} {
+		nm, cmd := d.Update(key)
+		if cmd != nil || rec.execVerb != "" || !strings.Contains(nm.(Dashboard).View(), "press D to delete") {
+			t.Fatalf("key %v on an invalid row should explain instead of acting", key)
+		}
 	}
 }
 

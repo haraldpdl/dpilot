@@ -197,3 +197,37 @@ func TestValidateNameRules(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadErrorsNameTheGroup(t *testing.T) {
+	tempHome(t)
+	if err := os.MkdirAll(mustDir(t), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(mustPath(t, "g"), []byte("members: [a, a]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Load("g")
+	if err == nil || !strings.Contains(err.Error(), `group "g"`) {
+		t.Fatalf("validation errors must name the group, got %v", err)
+	}
+}
+
+func TestListSkipsNamelessFilesAndLoadNamesEmptyFiles(t *testing.T) {
+	tempHome(t)
+	if err := os.MkdirAll(mustDir(t), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(mustPath(t, ""), []byte("members: [a]\n"), 0o644); err != nil { // ".yaml"
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(mustPath(t, "empty"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	names, err := List()
+	if err != nil || len(names) != 1 || names[0] != "empty" {
+		t.Fatalf("a nameless .yaml must not be listed, got %v (%v)", names, err)
+	}
+	if _, err := Load("empty"); err == nil || !strings.Contains(err.Error(), "file is empty") {
+		t.Fatalf("an empty file should say so, got %v", err)
+	}
+}

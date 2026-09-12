@@ -7,15 +7,19 @@ import (
 	"github.com/haraldpdl/dpilot/pkg/ddev"
 )
 
-// GroupSummary is a group's name with member and running-member counts.
+// GroupSummary is a group's name with member and running-member counts. A
+// group whose file cannot be loaded is still listed, with Err set and zero
+// counts, so one broken file never hides the others.
 type GroupSummary struct {
 	Name    string
 	Members int
 	Running int
+	Err     string
 }
 
 // GroupSummaries returns a summary for every configured group, computing the
-// running-member count from a single ddev project listing.
+// running-member count from a single ddev project listing. Only a failure to
+// list the groups directory or to reach ddev is returned as an error.
 func GroupSummaries(ctx context.Context, c ddev.Client) ([]GroupSummary, error) {
 	names, err := config.List()
 	if err != nil {
@@ -38,7 +42,8 @@ func GroupSummaries(ctx context.Context, c ddev.Client) ([]GroupSummary, error) 
 	for _, n := range names {
 		g, err := config.Load(n)
 		if err != nil {
-			return nil, err
+			summaries = append(summaries, GroupSummary{Name: n, Err: err.Error()})
+			continue
 		}
 		s := GroupSummary{Name: n, Members: len(g.Members)}
 		for _, m := range g.Members {
