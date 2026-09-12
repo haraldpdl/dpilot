@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -94,7 +95,7 @@ func mustPath(t *testing.T, n string) string { d, _ := Dir(); return d + "/" + n
 
 func TestPathRejectsUnsafeNames(t *testing.T) {
 	tempHome(t)
-	for _, name := range []string{"../escaped", "sub/dir", "..", ".", "-foo", ".hidden", " x"} {
+	for _, name := range []string{"../escaped", "sub/dir", "..", "."} {
 		if err := Save(&Group{Name: name, Members: []string{"x"}}); err == nil {
 			t.Errorf("Save(%q): expected rejection, got nil", name)
 		}
@@ -134,11 +135,38 @@ func TestLoadUsesFilenameAsName(t *testing.T) {
 	if got.Name != "g" {
 		t.Fatalf("expected filename to win, got name %q", got.Name)
 	}
+	got.Members = append(got.Members, "b")
 	if err := Save(got); err != nil {
 		t.Fatalf("save: %v", err)
 	}
 	if ok, _ := Exists("other"); ok {
 		t.Fatal("Save wrote to the YAML name instead of the loaded file")
+	}
+	data, err := os.ReadFile(mustPath(t, "g"))
+	if err != nil || !strings.Contains(string(data), "- b") || !strings.Contains(string(data), "name: g") {
+		t.Fatalf("Save should rewrite the loaded file under its own name, got %q (%v)", data, err)
+	}
+}
+
+func TestLegacyGroupNamesStayUsable(t *testing.T) {
+	tempHome(t)
+	if err := os.MkdirAll(mustDir(t), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"my group", "_shared", "-legacy"} {
+		if err := os.WriteFile(mustPath(t, name), []byte("members: [a]\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		g, err := Load(name)
+		if err != nil {
+			t.Fatalf("Load(%q): a group file made by an earlier release must still load: %v", name, err)
+		}
+		if err := Save(g); err != nil {
+			t.Fatalf("Save(%q): %v", name, err)
+		}
+		if err := Delete(name); err != nil {
+			t.Fatalf("Delete(%q): %v", name, err)
+		}
 	}
 }
 

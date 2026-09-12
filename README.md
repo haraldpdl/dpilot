@@ -81,8 +81,9 @@ dpilot's command vocabulary mirrors ddev so the two feel like one toolset.
 
 ### Group names and members
 
-Group names may use letters, digits, `.`, `_` and `-`, and must start with a
-letter or digit. Members must be valid ddev project names; dpilot rejects any
+New group names may use letters, digits, `.`, `_` and `-`, and must start with
+a letter or digit; group files created by earlier releases with looser names
+keep working. Members must be valid ddev project names; dpilot rejects any
 other value in a group file and always passes names to ddev after `--`, so a
 member can never be read as a ddev flag. The filename is the group's identity:
 the `name:` field inside the YAML is informational.

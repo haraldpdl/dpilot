@@ -165,7 +165,7 @@ func (e Editor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch key.Type {
 		case tea.KeyEnter:
 			d, err := time.ParseDuration(strings.TrimSpace(e.toInput.Value()))
-			if err != nil {
+			if err != nil || d <= 0 {
 				e.errMsg = "invalid duration (try 120s, 2m)"
 				return e, nil
 			}

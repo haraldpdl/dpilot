@@ -114,3 +114,9 @@ func TestDashboardTickRefreshesListOnly(t *testing.T) {
 		t.Fatal("tick must not change mode while describing")
 	}
 }
+
+func TestSelfArgsTerminateFlags(t *testing.T) {
+	if got := selfArgs("start", "-legacy"); len(got) != 3 || got[1] != "--" || got[2] != "-legacy" {
+		t.Fatalf("group must follow --, got %v", got)
+	}
+}

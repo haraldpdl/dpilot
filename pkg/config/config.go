@@ -61,15 +61,16 @@ func Dir() (string, error) {
 }
 
 var (
-	// nameRE is the group-name rule: a filename-safe token that can never be
-	// taken for a flag, a dotfile, or a path component.
+	// nameRE is the rule for new group names: a filename-safe token that can
+	// never be taken for a flag, a dotfile, or a path component.
 	nameRE = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 	// memberRE mirrors ddev's own project-name rule (RFC 1123 hostname), so a
 	// member can never be parsed by ddev as a flag.
 	memberRE = regexp.MustCompile(`^([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?\.)*[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$`)
 )
 
-// ValidateName reports whether name is a legal group name.
+// ValidateName is the rule for creating a group. Groups created by earlier
+// releases may have looser names; those files stay usable (see pathSafe).
 func ValidateName(name string) error {
 	if !nameRE.MatchString(name) {
 		return fmt.Errorf("invalid group name %q: use letters, digits, '.', '_' or '-', starting with a letter or digit", name)
@@ -77,8 +78,17 @@ func ValidateName(name string) error {
 	return nil
 }
 
+// pathSafe is the rule for addressing an existing group file: it only has to
+// stay inside the groups directory.
+func pathSafe(name string) error {
+	if name == "" || name == "." || name == ".." || strings.ContainsAny(name, "/\\") {
+		return fmt.Errorf("invalid group name %q", name)
+	}
+	return nil
+}
+
 func path(name string) (string, error) {
-	if err := ValidateName(name); err != nil {
+	if err := pathSafe(name); err != nil {
 		return "", err
 	}
 	d, err := Dir()
@@ -90,11 +100,13 @@ func path(name string) (string, error) {
 
 // Validate checks invariants.
 func (g *Group) Validate() error {
-	if err := ValidateName(g.Name); err != nil {
+	if err := pathSafe(g.Name); err != nil {
 		return err
 	}
+	// 0 means "unset, use the default" (it is what omitempty writes back);
+	// an explicit non-positive value is rejected when the YAML is decoded.
 	if g.WaitTimeout < 0 {
-		return errors.New("wait_timeout must be positive")
+		return errors.New("wait_timeout must not be negative")
 	}
 	seen := map[string]bool{}
 	for _, m := range g.Members {

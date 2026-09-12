@@ -68,14 +68,17 @@ func TestEditorTimeoutParse(t *testing.T) {
 	if e.Result().WaitTimeout.Duration() != 90*time.Second {
 		t.Fatalf("expected 90s, got %v", e.Result().WaitTimeout.Duration())
 	}
-	e = send(e, runes("t"))
-	e.toInput.SetValue("nope")
-	e = send(e, kt(tea.KeyEnter))
-	if e.errMsg == "" {
-		t.Fatal("expected error for invalid duration")
-	}
-	if e.Result().WaitTimeout.Duration() != 90*time.Second {
-		t.Fatal("timeout should be unchanged after invalid input")
+	for _, bad := range []string{"nope", "0s", "-5s"} {
+		e = send(e, runes("t"))
+		e.toInput.SetValue(bad)
+		e = send(e, kt(tea.KeyEnter))
+		if e.errMsg == "" {
+			t.Fatalf("expected error for duration %q", bad)
+		}
+		if e.Result().WaitTimeout.Duration() != 90*time.Second {
+			t.Fatalf("timeout should be unchanged after invalid input %q", bad)
+		}
+		e = send(e, kt(tea.KeyEsc)) // back to select phase
 	}
 }
 
