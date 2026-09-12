@@ -5,6 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/haraldpdl/dpilot/pkg/ddev"
 )
 
@@ -80,4 +81,25 @@ func window(n, cursor, budget int) (start, end, above, below int) {
 		return start, end, 0, 0
 	}
 	return start, end, start, n - end
+}
+
+// box draws content inside the rounded border, first cutting every line to
+// the terminal width (0 = unknown) so a long name or notice cannot push the
+// right border off screen.
+func box(content string, width int) string {
+	if width > 0 {
+		inner := max(1, width-4) // border (2) + padding (2)
+		lines := strings.Split(content, "\n")
+		for i, line := range lines {
+			// lipgloss pads multi-line blocks with spaces; never let invisible
+			// padding trigger a cut or earn an ellipsis.
+			line = strings.TrimRight(line, " ")
+			if lipgloss.Width(line) > inner {
+				line = ansi.Truncate(line, inner, "…") // keeps escape sequences, cuts at grapheme boundaries
+			}
+			lines[i] = line
+		}
+		content = strings.Join(lines, "\n")
+	}
+	return borderStyle.Render(content)
 }

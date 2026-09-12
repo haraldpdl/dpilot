@@ -73,6 +73,7 @@ type Dashboard struct {
 	notice   string // action/save/delete failure; sticky until the next key press
 	describe []orchestrator.MemberState
 	editor   Editor
+	width    int // terminal columns, 0 = unknown
 	height   int // terminal rows, 0 = unknown
 	// pendingDelete is the group named in the confirm prompt, captured when
 	// the prompt opens so a concurrent refresh cannot retarget it.
@@ -148,7 +149,7 @@ func (d Dashboard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return d, nil
 		}
 		d.editor = NewEditor(m.opts)
-		d.editor.height = d.height // WindowSizeMsg only arrives at start and on resize
+		d.editor.width, d.editor.height = d.width, d.height // WindowSizeMsg only arrives at start and on resize
 		d.mode = modeEditor
 		return d, d.editor.Init()
 	case actionDoneMsg:
@@ -159,8 +160,8 @@ func (d Dashboard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmd := d.refresh()
 		return d, cmd
 	case tea.WindowSizeMsg:
-		d.height = m.Height
-		d.editor.height = m.Height
+		d.width, d.height = m.Width, m.Height
+		d.editor.width, d.editor.height = m.Width, m.Height
 		return d, nil
 	case tickMsg:
 		if d.mode == modeList {
@@ -327,7 +328,7 @@ func (d Dashboard) View() string {
 		return d.editor.View()
 	}
 	if d.mode == modeDescribe {
-		return describeView(d.describe, d.height)
+		return describeView(d.describe, d.width, d.height)
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s\n\n", titleStyle.Render("dpilot groups"))
@@ -366,7 +367,7 @@ func (d Dashboard) View() string {
 	if d.notice != "" {
 		fmt.Fprintf(&b, "\n%s", d.notice)
 	}
-	return borderStyle.Render(b.String())
+	return box(b.String(), d.width)
 }
 
 // rowBudget is how many terminal rows the group list may use: the height

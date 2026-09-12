@@ -9,6 +9,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/haraldpdl/dpilot/pkg/config"
 	"github.com/haraldpdl/dpilot/pkg/ddev"
 	"github.com/haraldpdl/dpilot/pkg/orchestrator"
@@ -413,5 +414,67 @@ func TestDashboardPassesSizeToEditorAndDescribe(t *testing.T) {
 	d.mode, d.describe, d.height = modeDescribe, states, 12
 	if v := d.View(); lines(v) > 12 || !strings.Contains(v, "m00") || !strings.Contains(v, "more") {
 		t.Fatalf("describe must fit the terminal too:\n%s", v)
+	}
+}
+
+func widest(v string) int {
+	w := 0
+	for _, line := range strings.Split(v, "\n") {
+		w = max(w, lipgloss.Width(line))
+	}
+	return w
+}
+
+func TestDashboardFitsTerminalWidth(t *testing.T) {
+	rec := &recorder{}
+	long := strings.Repeat("verylonggroupname", 5)
+	rows := []GroupRow{{Name: long, Members: 3, Running: 1}, {Name: "b", Error: strings.Repeat("parse error detail ", 20)}}
+	d := seeded(NewDashboard(testLoader(rec, rows, nil)), rows)
+	d = dsend(d, tea.WindowSizeMsg{Width: 60, Height: 20})
+	d.notice = strings.Repeat("start \"g\" failed: something went wrong in docker ", 6)
+	d.err = strings.Repeat("ddev [list -j]: context deadline exceeded ", 4)
+	if w := widest(d.View()); w > 60 {
+		t.Fatalf("dashboard must not exceed the terminal width (60), widest line %d:\n%s", w, d.View())
+	}
+	d.mode = modeConfirmDelete
+	d.pendingDelete = long
+	if w := widest(d.View()); w > 60 {
+		t.Fatalf("confirm prompt must fit too, widest line %d", w)
+	}
+	var states []orchestrator.MemberState
+	states = append(states, orchestrator.MemberState{Name: long, Status: ddev.StatusRunning})
+	d.mode, d.describe = modeDescribe, states
+	if w := widest(d.View()); w > 60 {
+		t.Fatalf("describe view must fit too, widest line %d", w)
+	}
+}
+
+func TestBoxCutsLinesExactly(t *testing.T) {
+	// width 12 -> 8 inner columns; each case is one content line.
+	cases := []struct{ in, want string }{
+		{"short", "short"},
+		{"exactly8", "exactly8"},
+		{"nine char", "nine ch…"},
+		{"\x1b[31mred text that is long\x1b[0m", "\x1b[31mred tex…\x1b[0m"}, // sequences kept, cut inside the style
+		{"日本語のテキスト長い", "日本語…"},                                              // wide cells: cut at a grapheme, never wider
+		{"pad" + strings.Repeat(" ", 30), "pad"},                            // trailing padding earns no ellipsis
+	}
+	for _, c := range cases {
+		out := box(c.in, 12)
+		inner := strings.Split(out, "\n")[1]
+		got := strings.TrimSuffix(strings.TrimPrefix(inner, "│ "), " │")
+		got = strings.TrimRight(got, " ")
+		if got != c.want {
+			t.Errorf("box(%q): got %q want %q", c.in, got, c.want)
+		}
+		if widest(out) > 12 {
+			t.Errorf("box(%q): width %d exceeds 12", c.in, widest(out))
+		}
+	}
+	if widest(box(strings.Repeat("x", 40), 3)) > 5 {
+		t.Error("tiny widths must still cut to one inner column")
+	}
+	if strings.Contains(box("a\n"+strings.Repeat(" ", 70)+"\nfooter", 40), "…") {
+		t.Error("a blank padded line must not show an ellipsis")
 	}
 }
