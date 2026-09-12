@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/haraldpdl/dpilot/pkg/config"
 	"github.com/haraldpdl/dpilot/pkg/ddev"
 	"github.com/haraldpdl/dpilot/pkg/orchestrator"
@@ -156,15 +156,15 @@ func TestDashboardActionFailureIsNamedAndSticky(t *testing.T) {
 	rows := []GroupRow{{Name: "g"}}
 	d := seeded(NewDashboard(testLoader(rec, rows, nil)), rows)
 	d = dsend(d, actionDoneMsg{verb: "start", group: "g", err: errors.New("exit status 1")})
-	if !strings.Contains(d.View(), `start "g" failed`) {
-		t.Fatalf("failure should name the action and group, view:\n%s", d.View())
+	if !strings.Contains(d.View().Content, `start "g" failed`) {
+		t.Fatalf("failure should name the action and group, view:\n%s", d.View().Content)
 	}
 	d = seeded(d, rows) // a successful refresh must not wipe it
-	if !strings.Contains(d.View(), `start "g" failed`) {
+	if !strings.Contains(d.View().Content, `start "g" failed`) {
 		t.Fatal("action failure must survive a rows refresh")
 	}
 	d = dsend(d, kt(tea.KeyDown)) // any key dismisses it
-	if strings.Contains(d.View(), "failed") {
+	if strings.Contains(d.View().Content, "failed") {
 		t.Fatal("a key press should clear the notice")
 	}
 }
@@ -272,7 +272,7 @@ func TestDashboardDoesNotReportUserInterruptAsFailure(t *testing.T) {
 	rec := &recorder{}
 	d := seeded(NewDashboard(testLoader(rec, nil, nil)), nil)
 	d = dsend(d, actionDoneMsg{verb: "start", group: "g", err: errors.New("signal: interrupt")})
-	if strings.Contains(d.View(), "failed") {
+	if strings.Contains(d.View().Content, "failed") {
 		t.Fatal("Ctrl-C in the streamed child is the user's choice, not a failure")
 	}
 }
@@ -284,7 +284,7 @@ func TestDashboardCtrlCQuitsInEveryMode(t *testing.T) {
 		d := seeded(NewDashboard(testLoader(rec, rows, nil)), rows)
 		d.mode = mode
 		d.editor = NewEditor(EditorOptions{Name: "g", NameFixed: true, Projects: projs("db")})
-		_, cmd := d.Update(kt(tea.KeyCtrlC))
+		_, cmd := d.Update(ctrlC())
 		if cmd == nil {
 			t.Fatalf("mode %v: ctrl+c returned no command", mode)
 		}
@@ -326,13 +326,13 @@ func TestDashboardShowsInvalidGroupRow(t *testing.T) {
 	rec := &recorder{}
 	rows := []GroupRow{{Name: "broken", Error: "parse group \"broken\": yaml: unmarshal errors:\n  line 1: field bogus not found in type config.Group"}}
 	d := seeded(NewDashboard(testLoader(rec, rows, nil)), rows)
-	v := d.View()
+	v := d.View().Content
 	if !strings.Contains(v, "broken") || !strings.Contains(v, "invalid: yaml: unmarshal errors: line 1: field bogus") {
 		t.Fatalf("invalid group should be visible on one row without its name repeated:\n%s", v)
 	}
-	for _, key := range []tea.KeyMsg{runes("s"), runes("x"), runes("r"), runes("e"), kt(tea.KeyEnter)} {
+	for _, key := range []tea.KeyPressMsg{runes("s"), runes("x"), runes("r"), runes("e"), kt(tea.KeyEnter)} {
 		nm, cmd := d.Update(key)
-		if cmd != nil || rec.execVerb != "" || !strings.Contains(nm.(Dashboard).View(), "press D to delete") {
+		if cmd != nil || rec.execVerb != "" || !strings.Contains(nm.(Dashboard).View().Content, "press D to delete") {
 			t.Fatalf("key %v on an invalid row should explain instead of acting", key)
 		}
 	}
@@ -356,7 +356,7 @@ func TestDashboardWindowsRowsAroundCursor(t *testing.T) {
 	for range 25 {
 		d = dsend(d, kt(tea.KeyDown))
 	}
-	v := d.View()
+	v := d.View().Content
 	if !strings.Contains(v, "row25") || strings.Contains(v, "row00") || !strings.Contains(v, "more") {
 		t.Fatalf("the cursor row must stay visible, far rows scroll away, hidden rows are marked:\n%s", v)
 	}
@@ -379,17 +379,17 @@ func TestDashboardFitsEveryHeight(t *testing.T) {
 			case "confirm":
 				d = dsend(d, runes("D"))
 			}
-			if got := lines(d.View()); got > max(h, minFit[variant]) {
+			if got := lines(d.View().Content); got > max(h, minFit[variant]) {
 				t.Errorf("height %d (%s): view has %d lines", h, variant, got)
 			}
-			if !strings.Contains(d.View(), "row03") {
+			if !strings.Contains(d.View().Content, "row03") {
 				t.Errorf("height %d (%s): cursor row not visible", h, variant)
 			}
 		}
 	}
 	empty := seeded(NewDashboard(testLoader(rec, nil, nil)), nil)
 	empty = dsend(empty, tea.WindowSizeMsg{Width: 80, Height: 7})
-	if got := lines(empty.View()); got > 7 {
+	if got := lines(empty.View().Content); got > 7 {
 		t.Errorf("empty dashboard at height 7 has %d lines", got)
 	}
 }
@@ -412,7 +412,7 @@ func TestDashboardPassesSizeToEditorAndDescribe(t *testing.T) {
 		states = append(states, orchestrator.MemberState{Name: fmt.Sprintf("m%02d", i), Status: ddev.StatusRunning})
 	}
 	d.mode, d.describe, d.height = modeDescribe, states, 12
-	if v := d.View(); lines(v) > 12 || !strings.Contains(v, "m00") || !strings.Contains(v, "more") {
+	if v := d.View().Content; lines(v) > 12 || !strings.Contains(v, "m00") || !strings.Contains(v, "more") {
 		t.Fatalf("describe must fit the terminal too:\n%s", v)
 	}
 }
@@ -433,18 +433,18 @@ func TestDashboardFitsTerminalWidth(t *testing.T) {
 	d = dsend(d, tea.WindowSizeMsg{Width: 60, Height: 20})
 	d.notice = strings.Repeat("start \"g\" failed: something went wrong in docker ", 6)
 	d.err = strings.Repeat("ddev [list -j]: context deadline exceeded ", 4)
-	if w := widest(d.View()); w > 60 {
-		t.Fatalf("dashboard must not exceed the terminal width (60), widest line %d:\n%s", w, d.View())
+	if w := widest(d.View().Content); w > 60 {
+		t.Fatalf("dashboard must not exceed the terminal width (60), widest line %d:\n%s", w, d.View().Content)
 	}
 	d.mode = modeConfirmDelete
 	d.pendingDelete = long
-	if w := widest(d.View()); w > 60 {
+	if w := widest(d.View().Content); w > 60 {
 		t.Fatalf("confirm prompt must fit too, widest line %d", w)
 	}
 	var states []orchestrator.MemberState
 	states = append(states, orchestrator.MemberState{Name: long, Status: ddev.StatusRunning})
 	d.mode, d.describe = modeDescribe, states
-	if w := widest(d.View()); w > 60 {
+	if w := widest(d.View().Content); w > 60 {
 		t.Fatalf("describe view must fit too, widest line %d", w)
 	}
 }

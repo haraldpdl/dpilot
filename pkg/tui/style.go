@@ -1,10 +1,10 @@
 package tui
 
 import (
+	"image/color"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/haraldpdl/dpilot/pkg/ddev"
 )
@@ -23,21 +23,16 @@ func statusColor(status string) string {
 		return status
 	}
 	st := ddev.ProjectStatus(status)
-	var c lipgloss.Color
+	var c color.Color
 	switch st.Tone() {
 	case ddev.ToneWarn:
-		c = lipgloss.Color("3")
+		c = lipgloss.Yellow
 	case ddev.ToneBad:
-		c = lipgloss.Color("1")
+		c = lipgloss.Red
 	default:
-		c = lipgloss.Color("2")
+		c = lipgloss.Green
 	}
 	return lipgloss.NewStyle().Foreground(c).Render(string(st))
-}
-
-// keyRune reports whether a key message is exactly the single rune r.
-func keyRune(k tea.KeyMsg, r rune) bool {
-	return k.Type == tea.KeyRunes && len(k.Runes) == 1 && k.Runes[0] == r
 }
 
 // shortError makes a load error fit one dashboard row: the group name is
