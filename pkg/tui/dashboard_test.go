@@ -229,19 +229,59 @@ func TestDashboardTickSkipsRefreshWhileOneIsInFlight(t *testing.T) {
 		t.Fatalf("tick must not start another load while one is in flight, got %d", calls)
 	}
 	d = seeded(d, nil) // first load answered
-	_, cmd = d.Update(tickMsg{})
+	nm, cmd := d.Update(tickMsg{})
+	if !nm.(Dashboard).loading {
+		t.Fatal("a tick that starts a load must mark it in flight on the returned model")
+	}
 	runCmd(d, cmd)
 	if calls != 1 {
 		t.Fatalf("tick after the load returned should refresh once, got %d", calls)
 	}
 }
 
+func TestDashboardIgnoresDuplicateAndStaleEditorOpens(t *testing.T) {
+	rec := &recorder{}
+	calls := 0
+	loader := testLoader(rec, nil, projs("db"))
+	loader.Projects = func() ([]ddev.Project, error) { calls++; return projs("db"), nil }
+	d := seeded(NewDashboard(loader), nil)
+	nm, first := d.Update(runes("n"))
+	d = nm.(Dashboard)
+	if nm, second := d.Update(runes("n")); second != nil || nm.(Dashboard).busy == "" {
+		t.Fatal("a second n while a load is pending must not start another load")
+	}
+	d = runCmd(d, first) // editor opens
+	d.editor.nameInput.SetValue("half-typed")
+	d = dsend(d, editorReadyMsg{opts: EditorOptions{Projects: projs("db")}}) // a late duplicate
+	if d.mode != modeEditor || d.editor.nameInput.Value() != "half-typed" {
+		t.Fatalf("a stray editorReadyMsg must not reset an open editor: mode=%v name=%q", d.mode, d.editor.nameInput.Value())
+	}
+	// Navigating away abandons a pending open.
+	d = seeded(NewDashboard(loader), []GroupRow{{Name: "g"}})
+	nm, pending := d.Update(runes("e"))
+	d = dsend(nm.(Dashboard), runes("D"))
+	d = runCmd(d, pending)
+	if d.mode != modeConfirmDelete || d.busy != "" {
+		t.Fatalf("an editor must not open over the delete prompt: mode=%v busy=%q", d.mode, d.busy)
+	}
+}
+
+func TestDashboardDoesNotReportUserInterruptAsFailure(t *testing.T) {
+	rec := &recorder{}
+	d := seeded(NewDashboard(testLoader(rec, nil, nil)), nil)
+	d = dsend(d, actionDoneMsg{verb: "start", group: "g", err: errors.New("signal: interrupt")})
+	if strings.Contains(d.View(), "failed") {
+		t.Fatal("Ctrl-C in the streamed child is the user's choice, not a failure")
+	}
+}
+
 func TestDashboardCtrlCQuitsInEveryMode(t *testing.T) {
 	rec := &recorder{}
 	rows := []GroupRow{{Name: "g"}}
-	for _, mode := range []dashMode{modeList, modeDescribe, modeConfirmDelete} {
+	for _, mode := range []dashMode{modeList, modeDescribe, modeConfirmDelete, modeEditor} {
 		d := seeded(NewDashboard(testLoader(rec, rows, nil)), rows)
 		d.mode = mode
+		d.editor = NewEditor(EditorOptions{Name: "g", NameFixed: true, Projects: projs("db")})
 		_, cmd := d.Update(kt(tea.KeyCtrlC))
 		if cmd == nil {
 			t.Fatalf("mode %v: ctrl+c returned no command", mode)

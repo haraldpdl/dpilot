@@ -136,6 +136,11 @@ func (d Dashboard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return d, nil
 	case editorReadyMsg:
+		if d.busy == "" || d.mode != modeList {
+			// Stale or duplicate: the user navigated away, or an editor is
+			// already open. Never replace an editor the user is typing in.
+			return d, nil
+		}
 		d.busy = ""
 		if m.err != nil {
 			d.notice = m.err.Error()
@@ -145,13 +150,16 @@ func (d Dashboard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		d.mode = modeEditor
 		return d, d.editor.Init()
 	case actionDoneMsg:
-		if m.err != nil {
+		// A child killed by the user's own Ctrl-C is not a failure to report.
+		if m.err != nil && !strings.Contains(m.err.Error(), "signal: interrupt") {
 			d.notice = fmt.Sprintf("%s %q failed: %v", m.verb, m.group, m.err)
 		}
-		return d, d.refresh()
+		cmd := d.refresh()
+		return d, cmd
 	case tickMsg:
 		if d.mode == modeList {
-			return d, tea.Batch(d.refresh(), tickCmd())
+			cmd := d.refresh()
+			return d, tea.Batch(cmd, tickCmd())
 		}
 		return d, tickCmd()
 	case tea.KeyMsg:
@@ -181,7 +189,8 @@ func (d Dashboard) updateEditor(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	d.mode = modeList
-	return d, d.refresh()
+	cmd = d.refresh() // the editor's own quit command is deliberately dropped
+	return d, cmd
 }
 
 func (d Dashboard) handleKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -201,7 +210,8 @@ func (d Dashboard) handleKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if err := d.loader.Delete(name); err != nil {
 			d.notice = err.Error()
 		}
-		return d, d.refresh()
+		cmd := d.refresh()
+		return d, cmd
 	default:
 		return d.handleListKey(k)
 	}
@@ -228,20 +238,25 @@ func (d Dashboard) handleListKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case keyRune(k, 'q'):
 		return d, tea.Quit
 	case keyRune(k, 'n'):
+		if d.busy != "" {
+			break // an editor open is already pending
+		}
 		d.busy = "loading projects..."
 		return d, d.openEditorNew()
 	case keyRune(k, 'e'):
-		if len(d.rows) > 0 {
+		if len(d.rows) > 0 && d.busy == "" {
 			d.busy = "loading projects..."
 			return d, d.openEditorEdit()
 		}
 	case keyRune(k, 'D'):
 		if len(d.rows) > 0 {
+			d.busy = "" // abandon a pending editor open
 			d.pendingDelete = d.rows[d.cursor].Name
 			d.mode = modeConfirmDelete
 		}
 	case k.Type == tea.KeyEnter:
 		if len(d.rows) > 0 {
+			d.busy = ""
 			return d, d.loadStatuses(d.rows[d.cursor].Name)
 		}
 	case keyRune(k, 's'):

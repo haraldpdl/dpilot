@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"time"
 )
 
 // Client is the seam over the ddev CLI. Project names are always passed after
@@ -45,7 +46,13 @@ func (c *CLI) capture(ctx context.Context, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, c.Bin, args...)
 	cmd.Stdout = &out
 	cmd.Stderr = &errBuf
+	// ddev spawns docker; when ctx expires, do not wait forever for a
+	// grandchild that inherited our pipes.
+	cmd.WaitDelay = 2 * time.Second
 	if err := cmd.Run(); err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, fmt.Errorf("ddev %v: %w", args, ctxErr)
+		}
 		return nil, fmt.Errorf("ddev %v: %w: %s", args, err, errBuf.String())
 	}
 	return out.Bytes(), nil
@@ -58,7 +65,11 @@ func (c *CLI) stream(ctx context.Context, args ...string) error {
 	cmd := exec.CommandContext(ctx, c.Bin, args...)
 	cmd.Stdout = c.Stdout
 	cmd.Stderr = c.Stderr
+	cmd.WaitDelay = 2 * time.Second
 	if err := cmd.Run(); err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return fmt.Errorf("ddev %v: %w", args, ctxErr)
+		}
 		return fmt.Errorf("ddev %v: %w", args, err)
 	}
 	return nil
