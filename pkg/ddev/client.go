@@ -38,14 +38,19 @@ func (c *CLI) ensure() error {
 	return nil
 }
 
-// cancelGrace is how long an interrupted ddev gets to clean up (stop
-// containers, release locks) before it is killed.
-const cancelGrace = 10 * time.Second
+// cancelGrace does two jobs (both via exec.Cmd.WaitDelay): after a
+// cancellation it is how long ddev may keep running before it is killed, and
+// after ddev exits it is how long we wait for a docker grandchild that still
+// holds our stdout/stderr pipes. Keep it short: ddev 1.25 exits at once on
+// SIGINT, and the second case delays every dashboard refresh by this much.
+// Tests shorten it.
+var cancelGrace = 3 * time.Second
 
 // command builds the ddev invocation. When ctx is cancelled (Ctrl-C, a
-// timeout) ddev receives SIGINT, as it would from the terminal, so it can
-// shut down cleanly; only if it is still running after cancelGrace is it
-// killed, which also unblocks us if a docker grandchild holds our pipes.
+// timeout) ddev receives SIGINT, the signal the terminal would send, rather
+// than SIGKILL; ddev 1.25 exits immediately either way, but this is what a
+// future ddev that cleans up on interrupt would need. Only if ddev is still
+// running after cancelGrace is it killed.
 func (c *CLI) command(ctx context.Context, args ...string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, c.Bin, args...)
 	cmd.Cancel = func() error { return cmd.Process.Signal(os.Interrupt) }

@@ -76,3 +76,24 @@ func TestCancelledCallInterruptsDdevSoItCanCleanUp(t *testing.T) {
 		t.Fatalf("ddev must receive SIGINT (not SIGKILL) so it can clean up; log: %q", b)
 	}
 }
+
+func TestCancelledCallKillsDdevThatIgnoresSigint(t *testing.T) {
+	c, argsFile := fakeCLI(t)
+	t.Setenv("DPILOT_HANG", "ignore")
+	old := cancelGrace
+	cancelGrace = 50 * time.Millisecond
+	defer func() { cancelGrace = old }()
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() { time.Sleep(100 * time.Millisecond); cancel() }()
+	begin := time.Now()
+	err := c.Start(ctx, "x")
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected the cancellation to surface, got %v", err)
+	}
+	if elapsed := time.Since(begin); elapsed > 2*time.Second {
+		t.Fatalf("a ddev that ignores SIGINT must be killed after the grace, took %v", elapsed)
+	}
+	if b, _ := os.ReadFile(argsFile); strings.Contains(string(b), "INT\n") {
+		t.Fatalf("the fixture should not have handled SIGINT: %q", b)
+	}
+}

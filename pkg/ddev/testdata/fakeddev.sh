@@ -6,7 +6,11 @@ printf "%s\n" "$*" >> "$DPILOT_ARGS_FILE"
 if [ -n "${DPILOT_HANG:-}" ]; then
   sleep 30 &
   child=$!
-  trap 'kill $child 2>/dev/null; printf "INT\n" >> "$DPILOT_ARGS_FILE"; exit 130' INT
+  if [ "$DPILOT_HANG" = "ignore" ]; then
+    trap '' INT # a ddev that does not react to SIGINT; only a kill ends it
+  else
+    trap 'kill $child 2>/dev/null; printf "INT\n" >> "$DPILOT_ARGS_FILE"; exit 130' INT
+  fi
   wait $child
   exit 0
 fi
