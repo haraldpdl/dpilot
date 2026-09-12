@@ -88,6 +88,13 @@ overridden per group with `wait_timeout` in the group YAML.
 Member order is the list order in the YAML. To reorder an existing member, use
 `dpilot remove` followed by `dpilot add --after`.
 
+## Development
+
+`make ci` runs the same gates as GitHub Actions (gofmt, go vet, staticcheck,
+`go mod tidy` drift, tests, build, cross-compile of every release target,
+govulncheck). `make hooks` installs git hooks in this clone that run the fast
+subset before each commit and the full set before each push.
+
 ## Integration tests
 
 The `integration/` package contains end-to-end tests that drive a real ddev
