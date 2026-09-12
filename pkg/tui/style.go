@@ -14,8 +14,9 @@ var (
 	dimStyle    = lipgloss.NewStyle().Faint(true)
 )
 
-// statusColor renders a ddev status with the label and tone ddev uses, from
-// the same mapping as the CLI tables (ddev.ProjectStatus.Tone/Label).
+// statusColor renders a ddev status in the tone ddev uses, from the same
+// mapping as the CLI tables (ddev.ProjectStatus.Tone). Like ddev's own TUI it
+// keeps the raw word; only the CLI tables say "OK" for running.
 func statusColor(status string) string {
 	if status == "" {
 		return status
@@ -30,7 +31,7 @@ func statusColor(status string) string {
 	default:
 		c = lipgloss.Color("2")
 	}
-	return lipgloss.NewStyle().Foreground(c).Render(st.Label())
+	return lipgloss.NewStyle().Foreground(c).Render(string(st))
 }
 
 // keyRune reports whether a key message is exactly the single rune r.

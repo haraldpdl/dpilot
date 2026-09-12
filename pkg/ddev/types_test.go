@@ -13,6 +13,9 @@ func TestStatusToneAndLabelFollowDdev(t *testing.T) {
 		{StatusMissing, ToneBad, "missing"},
 		{StatusPaused, ToneWarn, "paused"},
 		{"unhealthy", ToneBad, "unhealthy"},
+		{"exited", ToneBad, "exited"},
+		{"project directory missing", ToneBad, "project directory missing"},
+		{".ddev/config.yaml missing", ToneBad, ".ddev/config.yaml missing"},
 		{"something-new", ToneGood, "something-new"}, // ddev's default branch is green
 	}
 	for _, c := range cases {

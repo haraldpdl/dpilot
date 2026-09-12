@@ -14,12 +14,12 @@ import (
 	"github.com/mattn/go-isatty"
 )
 
-// ddevStyle is ddev's default table look (StyleLight box, separated rows,
-// upper-case headers), so dpilot's tables sit next to ddev's unnoticed.
+// ddevStyle is ddev's default table look (StyleLight box, which already
+// upper-cases headers, plus separated rows), so dpilot's tables sit next to
+// ddev's unnoticed.
 var ddevStyle = func() table.Style {
 	s := table.StyleLight
 	s.Options.SeparateRows = true
-	s.Format.Header = text.FormatUpper
 	return s
 }()
 
@@ -66,6 +66,8 @@ func writeJSON(w io.Writer, msg string, raw any) error {
 // Info writes one ddev-style info envelope: text in msg, data in raw.
 func Info(w io.Writer, msg string, raw any) error { return writeJSON(w, msg, raw) }
 
+// colorize is stricter than ddev, which colours whenever NO_COLOR is unset:
+// piped output never carries escape codes here.
 func colorize(w io.Writer) bool {
 	f, ok := w.(*os.File)
 	if !ok {
@@ -96,14 +98,14 @@ func colorStatus(s string, enabled bool) string {
 // Groups renders the group list as a table or JSON. Invalid groups appear in
 // the table marked "invalid", with their errors listed below it.
 func Groups(w io.Writer, rows []GroupRow, jsonOut bool) error {
-	text := renderGroups(rows)
+	out := renderGroups(rows)
 	if jsonOut {
 		if rows == nil {
 			rows = []GroupRow{}
 		}
-		return writeJSON(w, text, rows)
+		return writeJSON(w, out, rows)
 	}
-	_, err := io.WriteString(w, text)
+	_, err := io.WriteString(w, out)
 	return err
 }
 

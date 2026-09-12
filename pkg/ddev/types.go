@@ -45,13 +45,15 @@ const (
 	ToneBad              // red
 )
 
-// Tone mirrors ddev's FormatSiteStatus: paused is yellow; stopped, missing
-// and unhealthy are red; anything else (running included) is green.
+// Tone mirrors ddev's FormatSiteStatus: paused is yellow; stopped, exited,
+// unhealthy and every "missing" status (dpilot's own, ddev's "project
+// directory missing" and ".ddev/config.yaml missing") are red; anything else,
+// running included, is green.
 func (s ProjectStatus) Tone() Tone {
 	switch {
 	case strings.Contains(string(s), string(StatusPaused)):
 		return ToneWarn
-	case s == StatusStopped, s == StatusMissing, s == "unhealthy", s == "exited":
+	case strings.Contains(string(s), "missing"), s == StatusStopped, s == "unhealthy", s == "exited":
 		return ToneBad
 	default:
 		return ToneGood
