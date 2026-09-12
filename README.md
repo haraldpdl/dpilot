@@ -68,7 +68,7 @@ aliases of `start` and `stop`.
 | `dpilot restart <group ...>` | | Stop (best-effort) then start (fail-fast). With `--all`/`-a`: stop every group in reverse name order, then start every group in name order. |
 | `dpilot list` | `l`, `ls` | List all groups with aggregate state in a ddev-style table. A group whose file cannot be loaded is listed as `invalid` with its error; the others are unaffected and the command still exits 0 (`-j` carries an `error` field on that row). |
 | `dpilot describe <group>` | `status`, `st`, `desc` | Show a group's members in order with their live ddev state. |
-| `dpilot create <group>` | | Scaffold an empty group file. Errors if the group already exists. |
+| `dpilot create <group>` | | Create a group: on a terminal this opens the group editor (see below); otherwise it scaffolds an empty group file. Errors if the group already exists. |
 | `dpilot add <group> <project> [--after <member>]` | | Append a member, or insert it after a named member. Validates the project exists via `ddev list -j`. |
 | `dpilot remove <group> <project>` | | Drop a member from the group. |
 | `dpilot delete <group>` | | Delete the group file. Asks `OK to delete group "<name>"? [Y/n]` on a terminal (blank answer means yes, as in ddev); when not interactive it refuses without `-y`, where ddev would take the default. |
@@ -136,6 +136,11 @@ view of your groups:
 - `enter` describe the selected group (members and live state).
 - `n` create a new group, `e` edit the selected group, `D` delete it.
 - `q` or `ctrl-c` quit.
+
+Lists longer than the terminal scroll with the cursor and mark hidden rows with
+`… N more above/below`. The dashboard refreshes every 3 seconds; each ddev call it
+makes is limited to 30 seconds, and a failed action or a group file that will not
+load is reported inside the box.
 
 Run `dpilot create <group>` in a terminal to open the group editor (the same
 picker reached from the dashboard's `n` and `e`):
