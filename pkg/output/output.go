@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -27,11 +29,26 @@ type MemberRow struct {
 	Status string `json:"status"`
 }
 
-func writeJSON(w io.Writer, v any) error {
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	return enc.Encode(v)
+// envelope is the shape ddev's -j output uses: the rendered text in msg and
+// the data in raw, so scripts written for ddev keep working.
+type envelope struct {
+	Level string `json:"level"`
+	Msg   string `json:"msg"`
+	Raw   any    `json:"raw"`
+	Time  string `json:"time"`
 }
+
+func writeJSON(w io.Writer, msg string, raw any) error {
+	return json.NewEncoder(w).Encode(envelope{
+		Level: "info",
+		Msg:   msg, // as rendered, trailing newline included, like ddev
+		Raw:   raw,
+		Time:  time.Now().Format(time.RFC3339),
+	})
+}
+
+// Info writes one ddev-style info envelope: text in msg, data in raw.
+func Info(w io.Writer, msg string, raw any) error { return writeJSON(w, msg, raw) }
 
 func colorize(w io.Writer) bool {
 	f, ok := w.(*os.File)
@@ -61,18 +78,24 @@ func colorStatus(s string, enabled bool) string {
 // Groups renders the group list as a table or JSON. Invalid groups appear in
 // the table marked "invalid", with their errors listed below it.
 func Groups(w io.Writer, rows []GroupRow, jsonOut bool) error {
+	text := renderGroups(rows)
 	if jsonOut {
 		if rows == nil {
 			rows = []GroupRow{}
 		}
-		return writeJSON(w, rows)
+		return writeJSON(w, text, rows)
 	}
+	_, err := io.WriteString(w, text)
+	return err
+}
+
+func renderGroups(rows []GroupRow) string {
 	if len(rows) == 0 {
-		_, err := fmt.Fprintln(w, "No dpilot groups found. Run 'dpilot create <group>' to make one.")
-		return err
+		return "No dpilot groups found. Run 'dpilot create <group>' to make one.\n"
 	}
+	var b strings.Builder
 	t := table.NewWriter()
-	t.SetOutputMirror(w)
+	t.SetOutputMirror(&b)
 	t.AppendHeader(table.Row{"GROUP", "MEMBERS", "RUNNING"})
 	// Pin the numeric columns: an "invalid" cell would otherwise flip
 	// go-pretty's content-based alignment for every row.
@@ -91,25 +114,31 @@ func Groups(w io.Writer, rows []GroupRow, jsonOut bool) error {
 	}
 	t.Render()
 	for _, r := range invalid { // every load error already names its group
-		if _, err := fmt.Fprintln(w, r.Error); err != nil {
-			return err
-		}
+		fmt.Fprintln(&b, r.Error)
 	}
-	return nil
+	return b.String()
 }
 
 // Describe renders a group's members as a table or JSON.
 func Describe(w io.Writer, group string, rows []MemberRow, jsonOut bool) error {
 	if jsonOut {
-		return writeJSON(w, map[string]any{"name": group, "members": rows})
+		if rows == nil {
+			rows = []MemberRow{}
+		}
+		return writeJSON(w, renderDescribe(rows, false), map[string]any{"name": group, "members": rows})
 	}
-	enabled := colorize(w)
+	_, err := io.WriteString(w, renderDescribe(rows, colorize(w)))
+	return err
+}
+
+func renderDescribe(rows []MemberRow, color bool) string {
+	var b strings.Builder
 	t := table.NewWriter()
-	t.SetOutputMirror(w)
+	t.SetOutputMirror(&b)
 	t.AppendHeader(table.Row{"#", "PROJECT", "STATUS"})
 	for i, r := range rows {
-		t.AppendRow(table.Row{i + 1, r.Name, colorStatus(r.Status, enabled)})
+		t.AppendRow(table.Row{i + 1, r.Name, colorStatus(r.Status, color)})
 	}
 	t.Render()
-	return nil
+	return b.String()
 }

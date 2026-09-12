@@ -55,7 +55,7 @@ func TestDescribeJSON(t *testing.T) {
 	var payload struct {
 		Members []struct{ Name, Status string } `json:"members"`
 	}
-	if err := json.Unmarshal([]byte(out), &payload); err != nil {
+	if err := json.Unmarshal(decodeEnvelope(t, out).Raw, &payload); err != nil {
 		t.Fatalf("describe -j not valid json: %v (%q)", err, out)
 	}
 	if payload.Members[1].Name != "ghost" || payload.Members[1].Status != "missing" {
@@ -87,7 +87,7 @@ func TestListJSON(t *testing.T) {
 		Members int    `json:"members"`
 		Running int    `json:"running"`
 	}
-	if err := json.Unmarshal([]byte(out), &rows); err != nil {
+	if err := json.Unmarshal(decodeEnvelope(t, out).Raw, &rows); err != nil {
 		t.Fatalf("list -j not valid json: %v (%q)", err, out)
 	}
 	if len(rows) != 1 || rows[0].Name != "mystack" || rows[0].Members != 2 || rows[0].Running != 1 {

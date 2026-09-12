@@ -4,6 +4,7 @@ import (
 	"runtime/debug"
 	"strings"
 
+	"github.com/haraldpdl/dpilot/pkg/output"
 	"github.com/spf13/cobra"
 )
 
@@ -11,10 +12,19 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print the dpilot version",
 	Args:  cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, _ []string) error {
-		cmd.Printf("dpilot %s\n", resolveVersion())
-		return nil
-	},
+	RunE:  func(cmd *cobra.Command, _ []string) error { return printVersion(cmd) },
+}
+
+// printVersion writes the version like ddev does: plain text, or under -j an
+// envelope whose raw payload carries the version.
+func printVersion(cmd *cobra.Command) error {
+	v := resolveVersion()
+	text := "dpilot version " + v + "\n"
+	if jsonOutput() {
+		return output.Info(cmd.OutOrStdout(), text, map[string]string{"version": v})
+	}
+	cmd.Print(text)
+	return nil
 }
 
 // resolveVersion returns the release version injected via -ldflags, falling back
@@ -34,4 +44,7 @@ func resolveVersion() string {
 
 func init() {
 	rootCmd.AddCommand(versionCmd)
+	// --version / -v as in ddev. Handled in the root command rather than via
+	// cobra's Version field so that -j is honoured.
+	rootCmd.PersistentFlags().BoolP("version", "v", false, "Print the dpilot version")
 }
