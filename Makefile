@@ -1,7 +1,7 @@
 # Quality gates. `make ci` is exactly what GitHub Actions runs; `make hooks`
 # wires the same gates into this clone (pre-commit: quick, pre-push: ci).
 GO ?= go
-STATICCHECK := honnef.co/go/tools/cmd/staticcheck@2026.1
+STATICCHECK := honnef.co/go/tools/cmd/staticcheck@2026.2.1
 GOVULNCHECK := golang.org/x/vuln/cmd/govulncheck@v1.8.0
 TESTFLAGS ?=
 
