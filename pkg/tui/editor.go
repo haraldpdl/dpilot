@@ -5,8 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/haraldpdl/dpilot/pkg/config"
 	"github.com/haraldpdl/dpilot/pkg/ddev"
 )
@@ -148,7 +149,7 @@ func (e Editor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		e.width, e.height = ws.Width, ws.Height
 		return e, nil
 	}
-	key, ok := msg.(tea.KeyMsg)
+	key, ok := msg.(tea.KeyPressMsg)
 	if !ok {
 		switch e.phase {
 		case phaseName:
@@ -162,14 +163,15 @@ func (e Editor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return e, nil
 	}
-	if key.Type == tea.KeyCtrlC {
+	k := key.String()
+	if k == "ctrl+c" {
 		e.saved, e.phase = false, editorDone
 		return e, tea.Quit
 	}
 	switch e.phase {
 	case phaseName:
-		switch key.Type {
-		case tea.KeyEnter:
+		switch k {
+		case "enter":
 			name := strings.TrimSpace(e.nameInput.Value())
 			if name == "" {
 				e.errMsg = "name cannot be empty"
@@ -185,7 +187,7 @@ func (e Editor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			e.name, e.errMsg, e.phase = name, "", phaseSelect
 			return e, nil
-		case tea.KeyEsc:
+		case "esc":
 			e.phase = editorDone
 			return e, tea.Quit
 		default:
@@ -194,8 +196,8 @@ func (e Editor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return e, cmd
 		}
 	case phaseTimeout:
-		switch key.Type {
-		case tea.KeyEnter:
+		switch k {
+		case "enter":
 			d, err := time.ParseDuration(strings.TrimSpace(e.toInput.Value()))
 			if err != nil || d <= 0 {
 				e.errMsg = "invalid duration (try 120s, 2m)"
@@ -203,7 +205,7 @@ func (e Editor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			e.timeout, e.errMsg, e.phase = d, "", phaseSelect
 			return e, nil
-		case tea.KeyEsc:
+		case "esc":
 			e.toInput.SetValue(e.timeout.String())
 			e.errMsg, e.phase = "", phaseSelect
 			return e, nil
@@ -217,34 +219,34 @@ func (e Editor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return e, tea.Quit
 	case phaseSelect:
 		switch {
-		case key.Type == tea.KeyUp || keyRune(key, 'k'):
+		case k == "up" || k == "k":
 			if e.cursor > 0 {
 				e.cursor--
 			}
-		case key.Type == tea.KeyDown || keyRune(key, 'j'):
+		case k == "down" || k == "j":
 			if e.cursor < len(e.rows)-1 {
 				e.cursor++
 			}
-		case key.Type == tea.KeySpace:
+		case k == "space":
 			if len(e.rows) > 0 {
 				e.toggle(e.rows[e.cursor].Name)
 			}
-		case keyRune(key, 'K'):
+		case k == "K":
 			if len(e.rows) > 0 {
 				e.move(e.rows[e.cursor].Name, -1)
 			}
-		case keyRune(key, 'J'):
+		case k == "J":
 			if len(e.rows) > 0 {
 				e.move(e.rows[e.cursor].Name, 1)
 			}
-		case keyRune(key, 't'):
+		case k == "t":
 			e.toInput.SetValue(e.timeout.String())
 			e.toInput.Focus()
 			e.phase = phaseTimeout
-		case key.Type == tea.KeyEnter:
+		case k == "enter":
 			e.saved, e.phase = true, editorDone
 			return e, tea.Quit
-		case key.Type == tea.KeyEsc || keyRune(key, 'q'):
+		case k == "esc" || k == "q":
 			e.phase = editorDone
 			return e, tea.Quit
 		}
@@ -253,14 +255,19 @@ func (e Editor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return e, nil
 }
 
-func (e Editor) View() string {
+// View renders the editor. Standalone (dpilot create) it owns the screen; when
+// the dashboard hosts it, the dashboard wraps content() in its own alt-screen
+// view instead.
+func (e Editor) View() tea.View { return tea.NewView(e.content()) }
+
+func (e Editor) content() string {
 	if e.phase == editorDone {
 		return ""
 	}
 	var b strings.Builder
 	switch e.phase {
 	case phaseName:
-		fmt.Fprintf(&b, "New group name:\n\n%s\n", e.nameInput.View())
+		fmt.Fprintf(&b, "New group name:\n\n%s\n", e.nameInputView())
 	case phaseTimeout:
 		fmt.Fprintf(&b, "wait_timeout:\n\n%s\n", e.toInput.View())
 	case phaseNoProjects:
@@ -292,6 +299,19 @@ func (e Editor) View() string {
 		fmt.Fprintf(&b, "\n%s", e.errMsg)
 	}
 	return box(b.String(), e.width)
+}
+
+// nameInputView renders the name field. bubbles v2 sizes the placeholder's rune
+// buffer from Width()+1, so an unbounded field shows only the placeholder's
+// first rune; give the field a width while it is empty so the whole hint shows,
+// and drop the width again once there is a value, because a width on a field
+// with content turns it into a horizontally scrolling window.
+func (e Editor) nameInputView() string {
+	ni := e.nameInput
+	if ni.Value() == "" {
+		ni.SetWidth(lipgloss.Width(ni.Placeholder))
+	}
+	return ni.View()
 }
 
 // rowBudget is how many terminal rows the project list may use: the height

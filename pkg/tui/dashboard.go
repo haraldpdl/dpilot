@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/haraldpdl/dpilot/pkg/config"
 	"github.com/haraldpdl/dpilot/pkg/ddev"
 	"github.com/haraldpdl/dpilot/pkg/orchestrator"
@@ -169,8 +169,8 @@ func (d Dashboard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return d, tea.Batch(cmd, tickCmd())
 		}
 		return d, tickCmd()
-	case tea.KeyMsg:
-		if m.Type == tea.KeyCtrlC {
+	case tea.KeyPressMsg:
+		if m.String() == "ctrl+c" {
 			return d, tea.Quit
 		}
 		d.notice = ""
@@ -200,7 +200,7 @@ func (d Dashboard) updateEditor(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return d, cmd
 }
 
-func (d Dashboard) handleKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (d Dashboard) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch d.mode {
 	case modeEditor:
 		return d.updateEditor(k)
@@ -211,7 +211,7 @@ func (d Dashboard) handleKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		name := d.pendingDelete
 		d.pendingDelete = ""
 		d.mode = modeList
-		if !keyRune(k, 'y') || name == "" {
+		if k.String() != "y" || name == "" {
 			return d, nil
 		}
 		if err := d.loader.Delete(name); err != nil {
@@ -224,57 +224,59 @@ func (d Dashboard) handleKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 }
 
-func (d Dashboard) handleListKey(k tea.KeyMsg) (tea.Model, tea.Cmd) {
+func (d Dashboard) handleListKey(key tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	k := key.String()
 	// A group whose file will not load cannot be started, described or
 	// edited; say so instead of shelling out to a command that fails.
 	if len(d.rows) > 0 && d.rows[d.cursor].Error != "" {
-		if k.Type == tea.KeyEnter || keyRune(k, 's') || keyRune(k, 'x') || keyRune(k, 'r') || keyRune(k, 'e') {
+		switch k {
+		case "enter", "s", "x", "r", "e":
 			d.err = "group file is invalid: press D to delete it, or fix ~/.dpilot/groups/" + d.rows[d.cursor].Name + ".yaml"
 			return d, nil
 		}
 	}
-	switch {
-	case k.Type == tea.KeyUp || keyRune(k, 'k'):
+	switch k {
+	case "up", "k":
 		if d.cursor > 0 {
 			d.cursor--
 		}
-	case k.Type == tea.KeyDown || keyRune(k, 'j'):
+	case "down", "j":
 		if d.cursor < len(d.rows)-1 {
 			d.cursor++
 		}
-	case keyRune(k, 'q'):
+	case "q":
 		return d, tea.Quit
-	case keyRune(k, 'n'):
+	case "n":
 		if d.busy != "" {
 			break // an editor open is already pending
 		}
 		d.busy = "loading projects..."
 		return d, d.openEditorNew()
-	case keyRune(k, 'e'):
+	case "e":
 		if len(d.rows) > 0 && d.busy == "" {
 			d.busy = "loading projects..."
 			return d, d.openEditorEdit()
 		}
-	case keyRune(k, 'D'):
+	case "D":
 		if len(d.rows) > 0 {
 			d.busy = "" // abandon a pending editor open
 			d.pendingDelete = d.rows[d.cursor].Name
 			d.mode = modeConfirmDelete
 		}
-	case k.Type == tea.KeyEnter:
+	case "enter":
 		if len(d.rows) > 0 {
 			d.busy = ""
 			return d, d.loadStatuses(d.rows[d.cursor].Name)
 		}
-	case keyRune(k, 's'):
+	case "s":
 		if len(d.rows) > 0 {
 			return d, d.loader.Exec("start", d.rows[d.cursor].Name)
 		}
-	case keyRune(k, 'x'):
+	case "x":
 		if len(d.rows) > 0 {
 			return d, d.loader.Exec("stop", d.rows[d.cursor].Name)
 		}
-	case keyRune(k, 'r'):
+	case "r":
 		if len(d.rows) > 0 {
 			return d, d.loader.Exec("restart", d.rows[d.cursor].Name)
 		}
@@ -323,9 +325,18 @@ func (d Dashboard) openEditorEdit() tea.Cmd {
 	}
 }
 
-func (d Dashboard) View() string {
+// View renders the dashboard full-screen. v2 requests the alternate screen per
+// view instead of with a program option, so the flag lives here and also covers
+// the hosted editor.
+func (d Dashboard) View() tea.View {
+	v := tea.NewView(d.content())
+	v.AltScreen = true
+	return v
+}
+
+func (d Dashboard) content() string {
 	if d.mode == modeEditor {
-		return d.editor.View()
+		return d.editor.content()
 	}
 	if d.mode == modeDescribe {
 		return describeView(d.describe, d.width, d.height)

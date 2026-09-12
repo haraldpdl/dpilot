@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/haraldpdl/dpilot/pkg/config"
 	"github.com/haraldpdl/dpilot/pkg/ddev"
 )
@@ -27,8 +27,25 @@ func send(e Editor, msgs ...tea.Msg) Editor {
 	return e
 }
 
-func runes(s string) tea.KeyMsg   { return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)} }
-func kt(t tea.KeyType) tea.KeyMsg { return tea.KeyMsg{Type: t} }
+// runes builds the key press a terminal reports for a printable character:
+// v2 carries the character in Key.Text, and Key.String() returns it verbatim.
+func runes(s string) tea.KeyPressMsg {
+	return tea.KeyPressMsg{Code: []rune(s)[0], Text: s}
+}
+
+// kt builds the key press for a special key code (tea.KeyEnter, tea.KeyUp, ...).
+// Space is printable but invisible, so v2 still stringifies it as "space".
+func kt(code rune) tea.KeyPressMsg {
+	k := tea.KeyPressMsg{Code: code}
+	if code == tea.KeySpace {
+		k.Text = " "
+	}
+	return k
+}
+
+// ctrlC builds Ctrl-C, which in v2 is the 'c' code plus the ctrl modifier
+// rather than a dedicated key type.
+func ctrlC() tea.KeyPressMsg { return tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl} }
 
 func TestEditorSelectCapturesOrder(t *testing.T) {
 	e := NewEditor(EditorOptions{Name: "g", NameFixed: true, Projects: projs("a", "b", "c")})
@@ -80,7 +97,7 @@ func TestEditorTimeoutParse(t *testing.T) {
 		if e.Result().WaitTimeout.Duration() != 90*time.Second {
 			t.Fatalf("timeout should be unchanged after invalid input %q", bad)
 		}
-		e = send(e, kt(tea.KeyEsc)) // back to select phase
+		e = send(e, kt(tea.KeyEscape)) // back to select phase
 	}
 }
 
@@ -103,7 +120,7 @@ func TestEditorNameUniqueness(t *testing.T) {
 
 func TestEditorSaveAndCancel(t *testing.T) {
 	e := NewEditor(EditorOptions{Name: "g", NameFixed: true, Projects: projs("a")})
-	e = send(e, kt(tea.KeyEsc))
+	e = send(e, kt(tea.KeyEscape))
 	if !e.Done() || e.Saved() {
 		t.Fatal("esc should finish without saving")
 	}
@@ -179,7 +196,7 @@ func TestEditorCtrlCCancelsInEveryPhase(t *testing.T) {
 		"timeout": send(NewEditor(EditorOptions{Name: "g", NameFixed: true, Projects: projs("a")}), runes("t")),
 	}
 	for phase, e := range cases {
-		nm, cmd := e.Update(kt(tea.KeyCtrlC))
+		nm, cmd := e.Update(ctrlC())
 		e = nm.(Editor)
 		if !e.Done() || e.Saved() {
 			t.Fatalf("%s phase: ctrl+c should cancel (done=%v saved=%v)", phase, e.Done(), e.Saved())
@@ -210,7 +227,7 @@ func TestEditorWindowsProjectsAroundCursorAtEveryHeight(t *testing.T) {
 		for range 25 {
 			e = send(e, kt(tea.KeyDown))
 		}
-		v := e.View()
+		v := e.View().Content
 		if got := strings.Count(v, "\n") + 1; got > h {
 			t.Errorf("height %d: view has %d lines:\n%s", h, got, v)
 		}
@@ -218,7 +235,7 @@ func TestEditorWindowsProjectsAroundCursorAtEveryHeight(t *testing.T) {
 			t.Errorf("height %d: list should scroll with the cursor:\n%s", h, v)
 		}
 		e.errMsg = "invalid duration"
-		if got := strings.Count(e.View(), "\n") + 1; got > h && h >= 10 {
+		if got := strings.Count(e.View().Content, "\n") + 1; got > h && h >= 10 {
 			t.Errorf("height %d with error: view has %d lines", h, got)
 		}
 	}
@@ -226,7 +243,7 @@ func TestEditorWindowsProjectsAroundCursorAtEveryHeight(t *testing.T) {
 
 func TestEditorShowsOrphanMembersFirstAndLetsUserRemoveThem(t *testing.T) {
 	e := NewEditor(EditorOptions{Name: "g", NameFixed: true, Projects: projs("a", "b"), InitialMembers: []string{"a", "ghost"}})
-	v := e.View()
+	v := e.View().Content
 	if !strings.Contains(v, "ghost") || !strings.Contains(v, "missing") {
 		t.Fatalf("a member ddev no longer lists must be shown as missing:\n%s", v)
 	}
@@ -261,7 +278,7 @@ func TestEditorFitsTerminalWidth(t *testing.T) {
 	e := NewEditor(EditorOptions{Name: strings.Repeat("group", 20), NameFixed: true, Projects: projs(long, "b")})
 	e = send(e, tea.WindowSizeMsg{Width: 50, Height: 20})
 	e.errMsg = strings.Repeat("invalid duration (try 120s, 2m) ", 5)
-	if w := widest(e.View()); w > 50 {
-		t.Fatalf("editor must not exceed the terminal width (50), widest line %d:\n%s", w, e.View())
+	if w := widest(e.View().Content); w > 50 {
+		t.Fatalf("editor must not exceed the terminal width (50), widest line %d:\n%s", w, e.View().Content)
 	}
 }

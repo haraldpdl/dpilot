@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/haraldpdl/dpilot/pkg/config"
 	"github.com/haraldpdl/dpilot/pkg/ddev"
 	"github.com/haraldpdl/dpilot/pkg/orchestrator"
@@ -28,9 +28,10 @@ func execAction(verb, group string) tea.Cmd {
 // "--" so a legacy dash-prefixed name is never parsed as a flag.
 func selfArgs(verb, group string) []string { return []string{verb, "--", group} }
 
-// RunDashboard runs the dashboard program full-screen.
+// RunDashboard runs the dashboard program full-screen. The alternate screen is
+// requested by Dashboard.View (tea.View.AltScreen), not by a program option.
 func RunDashboard(loader Loader) error {
-	_, err := tea.NewProgram(NewDashboard(loader), tea.WithAltScreen()).Run()
+	_, err := tea.NewProgram(NewDashboard(loader)).Run()
 	return err
 }
 
