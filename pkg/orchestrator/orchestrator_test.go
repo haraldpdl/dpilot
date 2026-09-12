@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -100,5 +101,102 @@ func TestRestartStartsEvenIfStopErrors(t *testing.T) {
 	}
 	if got := strings.Join(f.calls, ","); got != "stop:api,stop:db,start:db,start:api" {
 		t.Fatalf("expected every stop attempted (reverse order) before any start, got %q", got)
+	}
+}
+
+func TestStartAbortsAfterCancellation(t *testing.T) {
+	f := newFakeClient()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	f.hook = func(name string) {
+		if name == "db" {
+			cancel() // Ctrl-C lands while db is starting
+		}
+	}
+	f.describeSeq["db"] = []*ddev.Describe{running("db")}
+	err := testOrch(f).Start(ctx, grp(120*time.Second, "db", "api"))
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected a cancellation error, got %v", err)
+	}
+	for _, name := range f.started {
+		if name == "api" {
+			t.Fatalf("api must not be started after cancellation, started %v", f.started)
+		}
+	}
+	if !strings.Contains(err.Error(), "db") {
+		t.Fatalf("the interrupted member should be named, got %v", err)
+	}
+}
+
+func TestStopAbortsAfterCancellation(t *testing.T) {
+	f := newFakeClient()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	f.hook = func(name string) {
+		if name == "web" {
+			cancel()
+		}
+	}
+	err := testOrch(f).Stop(ctx, grp(0, "db", "api", "web"))
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected a cancellation error, got %v", err)
+	}
+	if len(f.stopped) != 0 {
+		t.Fatalf("no member may be reported stopped after cancellation, stopped %v", f.stopped)
+	}
+	// The interrupted member's state is unknown, so it is listed too.
+	if !strings.Contains(err.Error(), "3 member(s) not stopped (db, api, web)") {
+		t.Fatalf("the user should be told which members were left running, got %q", err)
+	}
+	if n := strings.Count(err.Error(), "context canceled"); n != 1 {
+		t.Fatalf("one cancellation should yield one error, got %d in %q", n, err)
+	}
+}
+
+func TestStopCancelledDuringLastMemberStillFails(t *testing.T) {
+	for _, members := range [][]string{{"db"}, {"db", "api"}} {
+		f := newFakeClient()
+		ctx, cancel := context.WithCancel(context.Background())
+		f.hook = func(name string) {
+			if name == "db" { // db is stopped last
+				cancel()
+			}
+		}
+		err := testOrch(f).Stop(ctx, grp(0, members...))
+		cancel()
+		if !errors.Is(err, context.Canceled) || !strings.Contains(err.Error(), "1 member(s) not stopped (db)") {
+			t.Fatalf("members %v: Ctrl-C during the last stop must not read as success, got %v", members, err)
+		}
+	}
+}
+
+func TestRestartDoesNotStartAfterCancelledStop(t *testing.T) {
+	f := newFakeClient()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	f.hook = func(name string) { cancel() }
+	err := testOrch(f).Restart(ctx, grp(120*time.Second, "db", "api"))
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected a cancellation error, got %v", err)
+	}
+	if len(f.started) != 0 {
+		t.Fatalf("restart must not start members after a cancelled stop, started %v", f.started)
+	}
+}
+
+func TestReadinessWaitReturnsPromptlyOnCancellation(t *testing.T) {
+	f := newFakeClient()
+	f.describeSeq["db"] = []*ddev.Describe{stopped("db")} // never ready
+	o := &Orchestrator{Client: f, Clock: realClock{}, Poll: 5 * time.Second, Out: io.Discard}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() { time.Sleep(20 * time.Millisecond); cancel() }()
+	begin := time.Now()
+	err := o.Start(ctx, grp(10*time.Second, "db")) // short, so a regression fails in seconds
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected a cancellation error, got %v", err)
+	}
+	if elapsed := time.Since(begin); elapsed > time.Second {
+		t.Fatalf("cancellation should interrupt the poll sleep, took %v", elapsed)
 	}
 }

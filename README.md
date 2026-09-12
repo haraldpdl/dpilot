@@ -60,8 +60,8 @@ dpilot's command vocabulary mirrors ddev so the two feel like one toolset.
 
 | Command | Alias | Description |
 |---|---|---|
-| `dpilot start <group>` | | Start members in order, readiness-gated. Fail-fast: if a member errors or times out, remaining members are not started; already-started members are left running. |
-| `dpilot stop <group>` | | Stop members in reverse order, best-effort (all members attempted; failures reported at the end). |
+| `dpilot start <group>` | | Start members in order, readiness-gated. Fail-fast: if a member errors, times out, or Ctrl-C is pressed, remaining members are not started; already-started members are left running. |
+| `dpilot stop <group>` | | Stop members in reverse order, best-effort (all members attempted; failures reported at the end). Ctrl-C stops driving ddev and names the members whose state is now unknown. |
 | `dpilot restart <group>` | | Stop (best-effort) then start (fail-fast). |
 | `dpilot list` | `l` | List all groups with aggregate state in a ddev-style table. |
 | `dpilot describe <group>` | `status` | Show a group's members in order with their live ddev state. |
