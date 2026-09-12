@@ -87,16 +87,17 @@ func window(n, cursor, budget int) (start, end, above, below int) {
 // the terminal width (0 = unknown) so a long name or notice cannot push the
 // right border off screen.
 func box(content string, width int) string {
-	if inner := width - 4; width > 0 && inner > 0 { // border (2) + padding (2)
+	if width > 0 {
+		inner := max(1, width-4) // border (2) + padding (2)
 		lines := strings.Split(content, "\n")
 		for i, line := range lines {
+			// lipgloss pads multi-line blocks with spaces; never let invisible
+			// padding trigger a cut or earn an ellipsis.
+			line = strings.TrimRight(line, " ")
 			if lipgloss.Width(line) > inner {
-				cut := ansi.Truncate(line, inner, "…")
-				if strings.Contains(cut, "\x1b[") {
-					cut += "\x1b[0m" // the cut may have dropped the style reset
-				}
-				lines[i] = cut
+				line = ansi.Truncate(line, inner, "…") // keeps escape sequences, cuts at grapheme boundaries
 			}
+			lines[i] = line
 		}
 		content = strings.Join(lines, "\n")
 	}

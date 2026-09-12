@@ -7,7 +7,6 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/haraldpdl/dpilot/pkg/config"
 	"github.com/haraldpdl/dpilot/pkg/ddev"
 )
@@ -262,11 +261,7 @@ func TestEditorFitsTerminalWidth(t *testing.T) {
 	e := NewEditor(EditorOptions{Name: strings.Repeat("group", 20), NameFixed: true, Projects: projs(long, "b")})
 	e = send(e, tea.WindowSizeMsg{Width: 50, Height: 20})
 	e.errMsg = strings.Repeat("invalid duration (try 120s, 2m) ", 5)
-	w := 0
-	for _, line := range strings.Split(e.View(), "\n") {
-		w = max(w, lipgloss.Width(line))
-	}
-	if w > 50 {
+	if w := widest(e.View()); w > 50 {
 		t.Fatalf("editor must not exceed the terminal width (50), widest line %d:\n%s", w, e.View())
 	}
 }

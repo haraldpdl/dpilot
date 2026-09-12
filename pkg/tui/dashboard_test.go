@@ -448,3 +448,33 @@ func TestDashboardFitsTerminalWidth(t *testing.T) {
 		t.Fatalf("describe view must fit too, widest line %d", w)
 	}
 }
+
+func TestBoxCutsLinesExactly(t *testing.T) {
+	// width 12 -> 8 inner columns; each case is one content line.
+	cases := []struct{ in, want string }{
+		{"short", "short"},
+		{"exactly8", "exactly8"},
+		{"nine char", "nine ch…"},
+		{"\x1b[31mred text that is long\x1b[0m", "\x1b[31mred tex…\x1b[0m"}, // sequences kept, cut inside the style
+		{"日本語のテキスト長い", "日本語…"},                                              // wide cells: cut at a grapheme, never wider
+		{"pad" + strings.Repeat(" ", 30), "pad"},                            // trailing padding earns no ellipsis
+	}
+	for _, c := range cases {
+		out := box(c.in, 12)
+		inner := strings.Split(out, "\n")[1]
+		got := strings.TrimSuffix(strings.TrimPrefix(inner, "│ "), " │")
+		got = strings.TrimRight(got, " ")
+		if got != c.want {
+			t.Errorf("box(%q): got %q want %q", c.in, got, c.want)
+		}
+		if widest(out) > 12 {
+			t.Errorf("box(%q): width %d exceeds 12", c.in, widest(out))
+		}
+	}
+	if widest(box(strings.Repeat("x", 40), 3)) > 5 {
+		t.Error("tiny widths must still cut to one inner column")
+	}
+	if strings.Contains(box("a\n"+strings.Repeat(" ", 70)+"\nfooter", 40), "…") {
+		t.Error("a blank padded line must not show an ellipsis")
+	}
+}
