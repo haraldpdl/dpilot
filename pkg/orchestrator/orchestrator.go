@@ -58,7 +58,7 @@ func (o *Orchestrator) Start(ctx context.Context, g *config.Group) error {
 		fmt.Fprintf(o.Out, "Starting %s (%d/%d)...\n", m, i+1, n)
 		if err := o.Client.Start(ctx, m); err != nil {
 			if cerr := ctx.Err(); cerr != nil {
-				return fmt.Errorf("aborted while starting %s: %w", m, cerr)
+				return fmt.Errorf("aborted while starting %s (%v): %w", m, err, cerr)
 			}
 			return fmt.Errorf("start %s: %w", m, err)
 		}
@@ -79,7 +79,7 @@ func (o *Orchestrator) waitReady(ctx context.Context, name string, timeout time.
 		d, err := o.Client.Describe(ctx, name)
 		if err != nil {
 			if cerr := ctx.Err(); cerr != nil {
-				return fmt.Errorf("aborted while waiting for %s: %w", name, cerr)
+				return fmt.Errorf("aborted while waiting for %s (%v): %w", name, err, cerr)
 			}
 			return fmt.Errorf("describe %s: %w", name, err)
 		}
@@ -96,32 +96,32 @@ func (o *Orchestrator) waitReady(ctx context.Context, name string, timeout time.
 }
 
 // Stop stops members in reverse order, best-effort, joining any errors. Once
-// ctx is cancelled it reports the members left running and returns a single
-// cancellation error instead of one failure per remaining member.
+// ctx is cancelled it stops driving ddev and returns a single error naming
+// the members not known to be stopped (the interrupted one included),
+// instead of one failure per remaining member.
 func (o *Orchestrator) Stop(ctx context.Context, g *config.Group) error {
 	var errs []error
 	for i := len(g.Members) - 1; i >= 0; i-- {
-		if err := ctx.Err(); err != nil {
-			left := g.Members[:i+1]
-			fmt.Fprintf(o.Out, "aborted: %d member(s) not stopped (%s)\n", len(left), strings.Join(reversed(left), ", "))
-			errs = append(errs, fmt.Errorf("aborted: %d member(s) not stopped: %w", len(left), err))
-			break
-		}
 		m := g.Members[i]
+		if err := ctx.Err(); err != nil {
+			return abortedStop(g.Members[:i+1], err, errs)
+		}
 		fmt.Fprintf(o.Out, "Stopping %s...\n", m)
-		if err := o.Client.Stop(ctx, m); err != nil && ctx.Err() == nil {
+		if err := o.Client.Stop(ctx, m); err != nil {
+			if cerr := ctx.Err(); cerr != nil {
+				return abortedStop(g.Members[:i+1], cerr, errs)
+			}
 			errs = append(errs, fmt.Errorf("stop %s: %w", m, err))
 		}
 	}
 	return errors.Join(errs...)
 }
 
-func reversed(s []string) []string {
-	out := make([]string, len(s))
-	for i, v := range s {
-		out[len(s)-1-i] = v
-	}
-	return out
+// abortedStop builds the single error returned when a stop is interrupted;
+// left lists the members in group order whose state is now unknown.
+func abortedStop(left []string, cause error, errs []error) error {
+	errs = append(errs, fmt.Errorf("aborted: %d member(s) not stopped (%s): %w", len(left), strings.Join(left, ", "), cause))
+	return errors.Join(errs...)
 }
 
 // Restart stops (best-effort) then starts (fail-fast). A stop error never

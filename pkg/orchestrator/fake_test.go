@@ -67,10 +67,13 @@ func (f *fakeClient) Describe(_ context.Context, name string) (*ddev.Describe, e
 	return seq[i], nil
 }
 
-func (f *fakeClient) Start(_ context.Context, name string) error {
+func (f *fakeClient) Start(ctx context.Context, name string) error {
 	f.calls = append(f.calls, "start:"+name)
 	if f.hook != nil {
 		f.hook(name)
+	}
+	if err := ctx.Err(); err != nil { // like the real client: exec fails once ctx is cancelled
+		return err
 	}
 	if err := f.startErr[name]; err != nil {
 		return err
@@ -79,10 +82,13 @@ func (f *fakeClient) Start(_ context.Context, name string) error {
 	return nil
 }
 
-func (f *fakeClient) Stop(_ context.Context, name string) error {
+func (f *fakeClient) Stop(ctx context.Context, name string) error {
 	f.calls = append(f.calls, "stop:"+name)
 	if f.hook != nil {
 		f.hook(name)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	if err := f.stopErr[name]; err != nil {
 		return err

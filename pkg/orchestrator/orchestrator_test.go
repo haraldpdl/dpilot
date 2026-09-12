@@ -132,21 +132,36 @@ func TestStopAbortsAfterCancellation(t *testing.T) {
 			cancel()
 		}
 	}
-	var out strings.Builder
-	o := testOrch(f)
-	o.Out = &out
-	err := o.Stop(ctx, grp(0, "db", "api", "web"))
+	err := testOrch(f).Stop(ctx, grp(0, "db", "api", "web"))
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected a cancellation error, got %v", err)
 	}
-	if strings.Join(f.stopped, ",") != "web" {
-		t.Fatalf("remaining members must not be attempted after cancellation, stopped %v", f.stopped)
+	if len(f.stopped) != 0 {
+		t.Fatalf("no member may be reported stopped after cancellation, stopped %v", f.stopped)
 	}
-	if !strings.Contains(out.String(), "not stopped") || !strings.Contains(out.String(), "api") || !strings.Contains(out.String(), "db") {
-		t.Fatalf("the user should be told which members were left running, got %q", out.String())
+	// The interrupted member's state is unknown, so it is listed too.
+	if !strings.Contains(err.Error(), "3 member(s) not stopped (db, api, web)") {
+		t.Fatalf("the user should be told which members were left running, got %q", err)
 	}
 	if n := strings.Count(err.Error(), "context canceled"); n != 1 {
 		t.Fatalf("one cancellation should yield one error, got %d in %q", n, err)
+	}
+}
+
+func TestStopCancelledDuringLastMemberStillFails(t *testing.T) {
+	for _, members := range [][]string{{"db"}, {"db", "api"}} {
+		f := newFakeClient()
+		ctx, cancel := context.WithCancel(context.Background())
+		f.hook = func(name string) {
+			if name == "db" { // db is stopped last
+				cancel()
+			}
+		}
+		err := testOrch(f).Stop(ctx, grp(0, members...))
+		cancel()
+		if !errors.Is(err, context.Canceled) || !strings.Contains(err.Error(), "1 member(s) not stopped (db)") {
+			t.Fatalf("members %v: Ctrl-C during the last stop must not read as success, got %v", members, err)
+		}
 	}
 }
 
@@ -169,9 +184,10 @@ func TestReadinessWaitReturnsPromptlyOnCancellation(t *testing.T) {
 	f.describeSeq["db"] = []*ddev.Describe{stopped("db")} // never ready
 	o := &Orchestrator{Client: f, Clock: realClock{}, Poll: 5 * time.Second, Out: io.Discard}
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	go func() { time.Sleep(20 * time.Millisecond); cancel() }()
 	begin := time.Now()
-	err := o.Start(ctx, grp(120*time.Second, "db"))
+	err := o.Start(ctx, grp(10*time.Second, "db")) // short, so a regression fails in seconds
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected a cancellation error, got %v", err)
 	}
