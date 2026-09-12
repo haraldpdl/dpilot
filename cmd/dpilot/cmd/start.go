@@ -17,8 +17,16 @@ func orch(cmd *cobra.Command) *orchestrator.Orchestrator {
 	return o
 }
 
+// signalCtx cancels on the first Ctrl-C. It then hands the signal back to the
+// default handler, so a second Ctrl-C ends dpilot at once instead of being
+// swallowed while ddev is given its grace period.
 func signalCtx() (context.Context, context.CancelFunc) {
-	return signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	go func() {
+		<-ctx.Done()
+		stop()
+	}()
+	return ctx, stop
 }
 
 // lifecycleArgs is the shared "<group ...> | --all" contract of

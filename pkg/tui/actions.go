@@ -35,7 +35,8 @@ func RunDashboard(loader Loader) error {
 }
 
 // ddevTimeout bounds every ddev call the dashboard makes, so a wedged Docker
-// daemon cannot hang the TUI and no ddev child outlives it.
+// daemon cannot hang the TUI for more than this plus the client's short kill
+// grace, after which no ddev child is left running.
 const ddevTimeout = 30 * time.Second
 
 func ddevCtx() (context.Context, context.CancelFunc) {

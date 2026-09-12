@@ -38,17 +38,34 @@ func (c *CLI) ensure() error {
 	return nil
 }
 
+// cancelGrace does two jobs (both via exec.Cmd.WaitDelay): after a
+// cancellation it is how long ddev may keep running before it is killed, and
+// after ddev exits it is how long we wait for a docker grandchild that still
+// holds our stdout/stderr pipes. Keep it short: ddev 1.25 exits at once on
+// SIGINT, and the second case delays every dashboard refresh by this much.
+// Tests shorten it.
+var cancelGrace = 3 * time.Second
+
+// command builds the ddev invocation. When ctx is cancelled (Ctrl-C, a
+// timeout) ddev receives SIGINT, the signal the terminal would send, rather
+// than SIGKILL; ddev 1.25 exits immediately either way, but this is what a
+// future ddev that cleans up on interrupt would need. Only if ddev is still
+// running after cancelGrace is it killed.
+func (c *CLI) command(ctx context.Context, args ...string) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, c.Bin, args...)
+	cmd.Cancel = func() error { return cmd.Process.Signal(os.Interrupt) }
+	cmd.WaitDelay = cancelGrace
+	return cmd
+}
+
 func (c *CLI) capture(ctx context.Context, args ...string) ([]byte, error) {
 	if err := c.ensure(); err != nil {
 		return nil, err
 	}
 	var out, errBuf bytes.Buffer
-	cmd := exec.CommandContext(ctx, c.Bin, args...)
+	cmd := c.command(ctx, args...)
 	cmd.Stdout = &out
 	cmd.Stderr = &errBuf
-	// ddev spawns docker; when ctx expires, do not wait forever for a
-	// grandchild that inherited our pipes.
-	cmd.WaitDelay = 2 * time.Second
 	if err := cmd.Run(); err != nil {
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return nil, fmt.Errorf("ddev %v: %w", args, ctxErr)
@@ -62,10 +79,9 @@ func (c *CLI) stream(ctx context.Context, args ...string) error {
 	if err := c.ensure(); err != nil {
 		return err
 	}
-	cmd := exec.CommandContext(ctx, c.Bin, args...)
+	cmd := c.command(ctx, args...)
 	cmd.Stdout = c.Stdout
 	cmd.Stderr = c.Stderr
-	cmd.WaitDelay = 2 * time.Second
 	if err := cmd.Run(); err != nil {
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return fmt.Errorf("ddev %v: %w", args, ctxErr)
