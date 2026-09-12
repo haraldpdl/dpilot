@@ -197,3 +197,17 @@ func TestValidateNameRules(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadErrorsNameTheGroup(t *testing.T) {
+	tempHome(t)
+	if err := os.MkdirAll(mustDir(t), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(mustPath(t, "g"), []byte("members: [a, a]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Load("g")
+	if err == nil || !strings.Contains(err.Error(), `group "g"`) {
+		t.Fatalf("validation errors must name the group, got %v", err)
+	}
+}

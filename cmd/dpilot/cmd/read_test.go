@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 
@@ -91,5 +92,20 @@ func TestListJSON(t *testing.T) {
 	}
 	if len(rows) != 1 || rows[0].Name != "mystack" || rows[0].Members != 2 || rows[0].Running != 1 {
 		t.Fatalf("unexpected list -j (want mystack members=2 running=1): %+v", rows)
+	}
+}
+
+func TestListSurvivesBrokenGroupFile(t *testing.T) {
+	t.Setenv("DPILOT_HOME", t.TempDir())
+	_ = config.Save(&config.Group{Name: "good", Members: []string{"db"}})
+	dir, _ := config.Dir()
+	_ = os.WriteFile(dir+"/broken.yaml", []byte("bogus: 1\n"), 0o644)
+	newClient = func() ddev.Client { return listClient{} }
+	out, err := run(t, "list")
+	if err != nil {
+		t.Fatalf("list must not fail because of one broken file: %v", err)
+	}
+	if !strings.Contains(out, "good") || !strings.Contains(out, "broken") {
+		t.Fatalf("both groups should be listed: %q", out)
 	}
 }

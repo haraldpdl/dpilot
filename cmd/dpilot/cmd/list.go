@@ -21,7 +21,7 @@ var listCmd = &cobra.Command{
 		}
 		rows := make([]output.GroupRow, 0, len(summaries))
 		for _, s := range summaries {
-			rows = append(rows, output.GroupRow{Name: s.Name, Members: s.Members, Running: s.Running})
+			rows = append(rows, output.GroupRow{Name: s.Name, Members: s.Members, Running: s.Running, Error: s.Err})
 		}
 		return output.Groups(cmd.OutOrStdout(), rows, jsonOut)
 	},

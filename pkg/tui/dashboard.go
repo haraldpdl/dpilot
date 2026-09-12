@@ -273,6 +273,10 @@ func (d Dashboard) View() string {
 		if i == d.cursor {
 			cursor = "> "
 		}
+		if r.Error != "" {
+			fmt.Fprintf(&b, "%s%-20s  invalid: %s\n", cursor, r.Name, r.Error)
+			continue
+		}
 		fmt.Fprintf(&b, "%s%-20s  members %d  running %d\n", cursor, r.Name, r.Members, r.Running)
 	}
 	if d.mode == modeConfirmDelete && len(d.rows) > 0 {
