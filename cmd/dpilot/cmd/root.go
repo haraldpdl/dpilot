@@ -26,15 +26,18 @@ var rootCmd = &cobra.Command{
 	Short:         "Orchestrate ordered groups of ddev projects",
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		if v, _ := cmd.Flags().GetBool("version"); v {
-			return printVersion(cmd)
-		}
-		if len(args) == 0 && isInteractive() {
-			return runDashboard(tui.ProductionLoader(newClient()))
-		}
-		return cmd.Help()
-	},
+}
+
+// runRoot is wired in init: as a literal field it would form an
+// initialization cycle through printVersion -> jsonOutput -> rootCmd.
+func runRoot(cmd *cobra.Command, args []string) error {
+	if v, _ := cmd.Flags().GetBool("version"); v {
+		return printVersion(cmd)
+	}
+	if len(args) == 0 && isInteractive() {
+		return runDashboard(tui.ProductionLoader(newClient()))
+	}
+	return cmd.Help()
 }
 
 // Execute runs the root command.
@@ -63,6 +66,7 @@ func ErrorLine(err error) string {
 }
 
 func init() {
+	rootCmd.RunE = runRoot
 	// Persistent like ddev's, so both `dpilot -j list` and `dpilot list -j` work.
 	rootCmd.PersistentFlags().BoolP("json-output", "j", false, "If true, user-oriented output will be in JSON format.")
 }

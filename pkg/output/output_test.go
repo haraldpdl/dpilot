@@ -131,6 +131,6 @@ func TestGroupsInvalidRowShowsError(t *testing.T) {
 	}
 	got := e.Raw
 	if len(got) != 2 || got[0].Error == "" || got[1].Error != "" {
-		t.Fatalf("json should carry error only on the broken row: %s (%v)", buf.String(), err)
+		t.Fatalf("json should carry error only on the broken row: %s", buf.String())
 	}
 }
