@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -164,5 +165,14 @@ func TestEditorNoProjectsExits(t *testing.T) {
 	e = send(e, kt(tea.KeyEnter))
 	if !e.Done() || e.Saved() {
 		t.Fatal("any key in phaseNoProjects should exit without saving")
+	}
+}
+
+func TestStatusColorUsesDdevLabels(t *testing.T) {
+	if got := statusColor("running"); !strings.Contains(got, "OK") {
+		t.Fatalf("running should render as OK like ddev, got %q", got)
+	}
+	if got := statusColor("stopped"); !strings.Contains(got, "stopped") {
+		t.Fatalf("stopped should keep its word, got %q", got)
 	}
 }

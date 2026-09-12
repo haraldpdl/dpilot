@@ -125,3 +125,38 @@ func TestGroupsInvalidRowShowsError(t *testing.T) {
 		t.Fatalf("json should carry error only on the broken row: %s (%v)", buf.String(), err)
 	}
 }
+
+func TestTablesUseDdevLightBoxStyle(t *testing.T) {
+	var buf bytes.Buffer
+	if err := Groups(&buf, []GroupRow{{Name: "a", Members: 1}, {Name: "b", Members: 2}}, false); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+	if strings.Contains(out, "+-") || !strings.Contains(out, "│") || !strings.Contains(out, "├") {
+		t.Fatalf("expected ddev's light box style with separated rows, got:\n%s", out)
+	}
+	buf.Reset()
+	if err := Describe(&buf, "g", []MemberRow{{Name: "db", Status: "running"}}, false); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(buf.String(), "+-") || !strings.Contains(buf.String(), "│") {
+		t.Fatalf("describe should use the same style, got:\n%s", buf.String())
+	}
+}
+
+func TestStatusCellsFollowDdevColours(t *testing.T) {
+	cases := map[string]string{
+		"running": "\x1b[32mOK\x1b[0m",
+		"stopped": "\x1b[31mstopped\x1b[0m",
+		"missing": "\x1b[31mmissing\x1b[0m",
+		"paused":  "\x1b[33mpaused\x1b[0m",
+	}
+	for status, want := range cases {
+		if got := colorStatus(status, true); got != want {
+			t.Errorf("%s: got %q want %q", status, got, want)
+		}
+	}
+	if got := colorStatus("running", false); got != "OK" {
+		t.Errorf("uncoloured running should read OK, got %q", got)
+	}
+}
