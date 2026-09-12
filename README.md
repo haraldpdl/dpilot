@@ -8,7 +8,8 @@ dpilot orchestrates ordered groups of [ddev](https://github.com/ddev/ddev) proje
 A dpilot group is a named, ordered set of ddev projects defined at
 `~/.dpilot/groups/<name>.yaml`. dpilot starts members in order (waiting for each
 to be ready before the next) and stops them in reverse, driving ddev through its
-CLI. It mirrors ddev's commands, aliases, flags, and output for familiarity.
+CLI. Its verbs, aliases, flags and output follow ddev's so the two feel like one
+toolset.
 
 ```bash
 dpilot create mystack
@@ -56,27 +57,30 @@ go build -o dpilot ./cmd/dpilot
 
 ## Commands
 
-dpilot's command vocabulary mirrors ddev so the two feel like one toolset.
+dpilot's command vocabulary follows ddev's. One deliberate difference: here
+`add` and `remove` edit a group's membership, whereas ddev uses them as legacy
+aliases of `start` and `stop`.
 
 | Command | Alias | Description |
 |---|---|---|
-| `dpilot start <group>` | | Start members in order, readiness-gated. Fail-fast: if a member errors, times out, or Ctrl-C is pressed, remaining members are not started; already-started members are left running. |
-| `dpilot stop <group>` | | Stop members in reverse order, best-effort (all members attempted; failures reported at the end). Ctrl-C stops driving ddev and names the members whose state is now unknown. |
-| `dpilot restart <group>` | | Stop (best-effort) then start (fail-fast). |
-| `dpilot list` | `l` | List all groups with aggregate state in a ddev-style table. A group whose file cannot be loaded is listed as `invalid` with its error; the others are unaffected and the command still exits 0 (`-j` carries an `error` field on that row). |
-| `dpilot describe <group>` | `status` | Show a group's members in order with their live ddev state. |
+| `dpilot start <group ...>` | | Start members in order, readiness-gated. Fail-fast: if a member errors, times out, or Ctrl-C is pressed, remaining members are not started; already-started members are left running. Several groups run one after another; `--all`/`-a` starts every group in name order. |
+| `dpilot stop <group ...>` | | Stop members in reverse order, best-effort (all members attempted; failures reported at the end). Ctrl-C stops driving ddev and names the members whose state is now unknown. `--all`/`-a` stops every group in reverse name order. |
+| `dpilot restart <group ...>` | | Stop (best-effort) then start (fail-fast). With `--all`/`-a`: stop every group in reverse name order, then start every group in name order. |
+| `dpilot list` | `l`, `ls` | List all groups with aggregate state in a ddev-style table. A group whose file cannot be loaded is listed as `invalid` with its error; the others are unaffected and the command still exits 0 (`-j` carries an `error` field on that row). |
+| `dpilot describe <group>` | `status`, `st`, `desc` | Show a group's members in order with their live ddev state. |
 | `dpilot create <group>` | | Scaffold an empty group file. Errors if the group already exists. |
 | `dpilot add <group> <project> [--after <member>]` | | Append a member, or insert it after a named member. Validates the project exists via `ddev list -j`. |
 | `dpilot remove <group> <project>` | | Drop a member from the group. |
-| `dpilot delete <group>` | | Delete the group file. Requires `-y` to confirm. |
-| `dpilot version` | | Print the dpilot version. |
+| `dpilot delete <group>` | | Delete the group file. Asks `OK to delete group "<name>"? [Y/n]` on a terminal (blank answer means yes, as in ddev); when not interactive it refuses without `-y`, where ddev would take the default. |
+| `dpilot version` | `--version`, `-v` | Print `dpilot version <x.y.z>`. |
 
 ### Flags
 
 | Flag | Commands | Description |
 |---|---|---|
-| `-j, --json-output` | `list`, `describe` | Machine-readable JSON output, matching ddev's `-j` behavior. |
+| `-j, --json-output` | `list`, `describe`, `version` (accepted anywhere: `dpilot -j list` or `dpilot list -j`) | Machine-readable output in ddev's `-j` envelope: `{"level","msg","raw","time"}` with the data under `raw` and the rendered text under `msg`; any error becomes a `fatal` JSON line on stderr. Lifecycle and authoring commands keep their plain progress text, and ddev's own output streams through unchanged. |
 | `-y, --yes` | `delete` | Skip the confirmation prompt. |
+| `-a, --all` | `start`, `stop`, `restart` | Act on every group instead of naming them. Like ddev, it refuses to run if any group file fails to load, and naming groups together with `--all` is an error. |
 | `--after <member>` | `add` | Insert the new member after `<member>` instead of appending. |
 
 ### Group names and members

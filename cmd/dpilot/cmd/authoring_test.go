@@ -19,10 +19,12 @@ func (s stubClient) Start(context.Context, string) error                      { 
 func (s stubClient) Stop(context.Context, string) error                       { return nil }
 
 func resetFlags(c *cobra.Command) {
-	c.Flags().VisitAll(func(f *pflag.Flag) {
+	reset := func(f *pflag.Flag) {
 		_ = f.Value.Set(f.DefValue)
 		f.Changed = false
-	})
+	}
+	c.Flags().VisitAll(reset)
+	c.PersistentFlags().VisitAll(reset)
 	for _, sub := range c.Commands() {
 		resetFlags(sub)
 	}

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/signal"
 
@@ -20,19 +21,61 @@ func signalCtx() (context.Context, context.CancelFunc) {
 	return signal.NotifyContext(context.Background(), os.Interrupt)
 }
 
+// lifecycleArgs is the shared "<group ...> | --all" contract of
+// start/stop/restart, mirroring ddev's "[projectname ...]" verbs.
+func lifecycleArgs(c *cobra.Command, allHelp string) {
+	c.Args = cobra.ArbitraryArgs
+	c.Flags().BoolP("all", "a", false, allHelp)
+}
+
+// groupsFor resolves the groups a lifecycle verb acts on: the named groups in
+// the order given, or every group in name order with --all.
+func groupsFor(cmd *cobra.Command, args []string) ([]*config.Group, error) {
+	all, _ := cmd.Flags().GetBool("all")
+	names := args
+	switch {
+	case all && len(args) > 0:
+		return nil, errors.New("give group names or --all, not both")
+	case !all && len(args) == 0:
+		return nil, errors.New("requires a group name or --all")
+	case all:
+		var err error
+		if names, err = config.List(); err != nil {
+			return nil, err
+		}
+	}
+	groups := make([]*config.Group, 0, len(names))
+	for _, n := range names {
+		g, err := config.Load(n)
+		if err != nil {
+			return nil, err
+		}
+		groups = append(groups, g)
+	}
+	return groups, nil
+}
+
 var startCmd = &cobra.Command{
-	Use:   "start <group>",
+	Use:   "start [group ...]",
 	Short: "Start all projects in a group, in order",
-	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		g, err := config.Load(args[0])
+		groups, err := groupsFor(cmd, args)
 		if err != nil {
 			return err
 		}
 		ctx, stop := signalCtx()
 		defer stop()
-		return orch(cmd).Start(ctx, g)
+		o := orch(cmd)
+		for _, g := range groups {
+			if err := o.Start(ctx, g); err != nil {
+				return err
+			}
+		}
+		return nil
 	},
 }
 
-func init() { rootCmd.AddCommand(startCmd) }
+func init() {
+	lifecycleArgs(startCmd, "Start all groups")
+	rootCmd.AddCommand(startCmd)
+}

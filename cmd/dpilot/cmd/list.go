@@ -10,11 +10,11 @@ import (
 
 var listCmd = &cobra.Command{
 	Use:     "list",
-	Aliases: []string{"l"},
+	Aliases: []string{"l", "ls"},
 	Short:   "List groups",
 	Args:    cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
-		jsonOut, _ := cmd.Flags().GetBool("json-output")
+		jsonOut := jsonOutput()
 		summaries, err := orchestrator.GroupSummaries(context.Background(), newClient())
 		if err != nil {
 			return err
@@ -27,7 +27,4 @@ var listCmd = &cobra.Command{
 	},
 }
 
-func init() {
-	listCmd.Flags().BoolP("json-output", "j", false, "output as JSON")
-	rootCmd.AddCommand(listCmd)
-}
+func init() { rootCmd.AddCommand(listCmd) }

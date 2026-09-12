@@ -80,6 +80,6 @@ func insert(members []string, project, after string) []string {
 }
 
 func init() {
-	addCmd.Flags().String("after", "", "insert after this member instead of appending")
+	addCmd.Flags().String("after", "", "Insert after this member instead of appending")
 	rootCmd.AddCommand(addCmd)
 }
