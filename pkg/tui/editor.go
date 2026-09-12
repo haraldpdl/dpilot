@@ -84,19 +84,21 @@ func NewEditor(opts EditorOptions) Editor {
 
 func (e Editor) Init() tea.Cmd { return textinput.Blink }
 
+// pickerRows lists members ddev no longer knows first, marked missing, so the
+// thing the user must act on is in view, followed by every ddev project.
 func pickerRows(projects []ddev.Project, members []string) []ddev.Project {
-	rows := append([]ddev.Project(nil), projects...)
 	known := map[string]bool{}
 	for _, p := range projects {
 		known[p.Name] = true
 	}
+	var rows []ddev.Project
 	for _, m := range members {
 		if !known[m] {
 			rows = append(rows, ddev.Project{Name: m, Status: ddev.StatusMissing})
 			known[m] = true
 		}
 	}
-	return rows
+	return append(rows, projects...)
 }
 
 func (e Editor) orderOf(name string) int {

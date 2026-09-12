@@ -364,6 +364,8 @@ func TestDashboardWindowsRowsAroundCursor(t *testing.T) {
 func TestDashboardFitsEveryHeight(t *testing.T) {
 	rec := &recorder{}
 	rows := manyRows(30)
+	// Smallest height at which the chrome plus one row fits, per variant.
+	minFit := map[string]int{"plain": 7, "notice": 8, "busy+err+notice": 10, "confirm": 7}
 	for h := 6; h <= 30; h++ {
 		for _, variant := range []string{"plain", "notice", "busy+err+notice", "confirm"} {
 			d := seeded(NewDashboard(testLoader(rec, rows, nil)), rows)
@@ -376,7 +378,7 @@ func TestDashboardFitsEveryHeight(t *testing.T) {
 			case "confirm":
 				d = dsend(d, runes("D"))
 			}
-			if got := lines(d.View()); got > h && h >= 9 {
+			if got := lines(d.View()); got > max(h, minFit[variant]) {
 				t.Errorf("height %d (%s): view has %d lines", h, variant, got)
 			}
 			if !strings.Contains(d.View(), "row03") {

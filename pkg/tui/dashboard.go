@@ -327,7 +327,7 @@ func (d Dashboard) View() string {
 		return d.editor.View()
 	}
 	if d.mode == modeDescribe {
-		return describeView(d.describe)
+		return describeView(d.describe, d.height)
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s\n\n", titleStyle.Render("dpilot groups"))
@@ -376,6 +376,9 @@ func (d Dashboard) rowBudget() int {
 		return 0
 	}
 	fixed := 6 // border (2), title + blank, blank + footer
+	if len(d.rows) == 0 {
+		fixed++ // the "no groups yet" line
+	}
 	for _, extra := range []string{d.busy, d.err, d.notice} {
 		if extra != "" {
 			fixed++

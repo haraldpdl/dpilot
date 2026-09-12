@@ -142,7 +142,8 @@ picker reached from the dashboard's `n` and `e`):
 
 - Move with the arrow keys; `space` adds or removes the highlighted ddev project.
   Selected projects show their start-order number. A member ddev no longer
-  lists is shown as `missing` so it can still be removed.
+  lists is shown first as `missing`; it stays in the group when you save unless
+  you remove it, and `K`/`J` reorder it like any other member.
 - `K`/`J` move the highlighted selected project earlier or later in the order.
 - `t` edits the readiness wait_timeout.
 - `enter` saves, `esc` cancels (`ctrl-c` quits dpilot from anywhere).
