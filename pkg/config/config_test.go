@@ -94,12 +94,78 @@ func mustPath(t *testing.T, n string) string { d, _ := Dir(); return d + "/" + n
 
 func TestPathRejectsUnsafeNames(t *testing.T) {
 	tempHome(t)
-	for _, name := range []string{"../escaped", "sub/dir", "..", "."} {
+	for _, name := range []string{"../escaped", "sub/dir", "..", ".", "-foo", ".hidden", " x"} {
 		if err := Save(&Group{Name: name, Members: []string{"x"}}); err == nil {
 			t.Errorf("Save(%q): expected rejection, got nil", name)
 		}
 		if _, err := Load(name); err == nil {
 			t.Errorf("Load(%q): expected rejection, got nil", name)
+		}
+	}
+}
+
+func TestValidateRejectsFlagLikeMembers(t *testing.T) {
+	for _, m := range []string{"-RO", "--all", "-", "a b", "bad_name", "trailing-"} {
+		g := &Group{Name: "g", Members: []string{m}}
+		if err := g.Validate(); err == nil {
+			t.Errorf("Validate member %q: expected rejection, got nil", m)
+		}
+	}
+	for _, m := range []string{"db", "my-api", "site.local", "a1", "x"} {
+		g := &Group{Name: "g", Members: []string{m}}
+		if err := g.Validate(); err != nil {
+			t.Errorf("Validate member %q: unexpected error %v", m, err)
+		}
+	}
+}
+
+func TestLoadUsesFilenameAsName(t *testing.T) {
+	tempHome(t)
+	if err := os.MkdirAll(mustDir(t), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(mustPath(t, "g"), []byte("name: other\nmembers: [a]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load("g")
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if got.Name != "g" {
+		t.Fatalf("expected filename to win, got name %q", got.Name)
+	}
+	if err := Save(got); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	if ok, _ := Exists("other"); ok {
+		t.Fatal("Save wrote to the YAML name instead of the loaded file")
+	}
+}
+
+func TestLoadRejectsNonPositiveTimeout(t *testing.T) {
+	tempHome(t)
+	if err := os.MkdirAll(mustDir(t), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, v := range []string{"0s", "-5s"} {
+		if err := os.WriteFile(mustPath(t, "g"), []byte("members: [a]\nwait_timeout: "+v+"\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Load("g"); err == nil {
+			t.Errorf("wait_timeout %q: expected rejection, got nil", v)
+		}
+	}
+}
+
+func TestValidateNameRules(t *testing.T) {
+	for _, n := range []string{"", " ", " x", "-foo", ".hidden", "a b", "a/b", "..", "."} {
+		if err := ValidateName(n); err == nil {
+			t.Errorf("ValidateName(%q): expected rejection, got nil", n)
+		}
+	}
+	for _, n := range []string{"mystack", "my-stack", "my_stack", "v1.2", "A9"} {
+		if err := ValidateName(n); err != nil {
+			t.Errorf("ValidateName(%q): unexpected error %v", n, err)
 		}
 	}
 }

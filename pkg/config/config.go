@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -29,6 +30,9 @@ func (d *Duration) UnmarshalYAML(value *yaml.Node) error {
 	parsed, err := time.ParseDuration(s)
 	if err != nil {
 		return fmt.Errorf("invalid wait_timeout %q: %w", s, err)
+	}
+	if parsed <= 0 {
+		return fmt.Errorf("invalid wait_timeout %q: must be positive", s)
 	}
 	*d = Duration(parsed)
 	return nil
@@ -56,9 +60,26 @@ func Dir() (string, error) {
 	return filepath.Join(base, "groups"), nil
 }
 
+var (
+	// nameRE is the group-name rule: a filename-safe token that can never be
+	// taken for a flag, a dotfile, or a path component.
+	nameRE = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
+	// memberRE mirrors ddev's own project-name rule (RFC 1123 hostname), so a
+	// member can never be parsed by ddev as a flag.
+	memberRE = regexp.MustCompile(`^([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?\.)*[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?$`)
+)
+
+// ValidateName reports whether name is a legal group name.
+func ValidateName(name string) error {
+	if !nameRE.MatchString(name) {
+		return fmt.Errorf("invalid group name %q: use letters, digits, '.', '_' or '-', starting with a letter or digit", name)
+	}
+	return nil
+}
+
 func path(name string) (string, error) {
-	if name == "" || name == "." || name == ".." || strings.ContainsAny(name, "/\\") {
-		return "", fmt.Errorf("invalid group name %q", name)
+	if err := ValidateName(name); err != nil {
+		return "", err
 	}
 	d, err := Dir()
 	if err != nil {
@@ -69,13 +90,16 @@ func path(name string) (string, error) {
 
 // Validate checks invariants.
 func (g *Group) Validate() error {
-	if strings.TrimSpace(g.Name) == "" {
-		return errors.New("group name is empty")
+	if err := ValidateName(g.Name); err != nil {
+		return err
+	}
+	if g.WaitTimeout < 0 {
+		return errors.New("wait_timeout must be positive")
 	}
 	seen := map[string]bool{}
 	for _, m := range g.Members {
-		if m == "" {
-			return errors.New("empty member name")
+		if !memberRE.MatchString(m) {
+			return fmt.Errorf("invalid member name %q: must be a ddev project name", m)
 		}
 		if seen[m] {
 			return fmt.Errorf("duplicate member %q", m)
@@ -104,9 +128,9 @@ func Load(name string) (*Group, error) {
 	if err := dec.Decode(&g); err != nil {
 		return nil, fmt.Errorf("parse group %q: %w", name, err)
 	}
-	if g.Name == "" {
-		g.Name = name
-	}
+	// The filename is the group's identity; a stale name: inside a copied or
+	// renamed file must not retarget Save.
+	g.Name = name
 	if g.WaitTimeout == 0 {
 		g.WaitTimeout = Duration(DefaultWaitTimeout)
 	}

@@ -166,3 +166,12 @@ func TestEditorNoProjectsExits(t *testing.T) {
 		t.Fatal("any key in phaseNoProjects should exit without saving")
 	}
 }
+
+func TestEditorNameRejectsInvalid(t *testing.T) {
+	e := NewEditor(EditorOptions{Projects: projs("a")})
+	e.nameInput.SetValue("-x")
+	e = send(e, kt(tea.KeyEnter))
+	if e.errMsg == "" || e.phase != phaseName {
+		t.Fatalf("invalid name should error and stay on name phase (err=%q phase=%d)", e.errMsg, e.phase)
+	}
+}
