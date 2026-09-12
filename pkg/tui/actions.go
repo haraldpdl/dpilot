@@ -56,7 +56,7 @@ func groupRows(client ddev.Client) ([]GroupRow, error) {
 	}
 	rows := make([]GroupRow, 0, len(summaries))
 	for _, s := range summaries {
-		rows = append(rows, GroupRow{Name: s.Name, Members: s.Members, Running: s.Running})
+		rows = append(rows, GroupRow{Name: s.Name, Members: s.Members, Running: s.Running, Error: s.Err})
 	}
 	return rows, nil
 }

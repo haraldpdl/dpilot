@@ -111,7 +111,7 @@ func Load(name string) (*Group, error) {
 		g.WaitTimeout = Duration(DefaultWaitTimeout)
 	}
 	if err := g.Validate(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("group %q: %w", name, err)
 	}
 	return &g, nil
 }

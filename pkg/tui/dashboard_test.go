@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -112,5 +113,14 @@ func TestDashboardTickRefreshesListOnly(t *testing.T) {
 	d2 := dsend(d, tickMsg{})
 	if d2.mode != modeDescribe {
 		t.Fatal("tick must not change mode while describing")
+	}
+}
+
+func TestDashboardShowsInvalidGroupRow(t *testing.T) {
+	rec := &recorder{}
+	rows := []GroupRow{{Name: "broken", Error: "parse group \"broken\": bad"}}
+	d := seeded(NewDashboard(testLoader(rec, rows, nil)), rows)
+	if v := d.View(); !strings.Contains(v, "broken") || !strings.Contains(v, "invalid") {
+		t.Fatalf("invalid group should be visible as such:\n%s", v)
 	}
 }

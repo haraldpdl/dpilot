@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -101,5 +102,19 @@ func TestPathRejectsUnsafeNames(t *testing.T) {
 		if _, err := Load(name); err == nil {
 			t.Errorf("Load(%q): expected rejection, got nil", name)
 		}
+	}
+}
+
+func TestLoadErrorsNameTheGroup(t *testing.T) {
+	tempHome(t)
+	if err := os.MkdirAll(mustDir(t), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(mustPath(t, "g"), []byte("members: [a, a]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Load("g")
+	if err == nil || !strings.Contains(err.Error(), `group "g"`) {
+		t.Fatalf("validation errors must name the group, got %v", err)
 	}
 }
