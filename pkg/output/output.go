@@ -8,11 +8,27 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fatih/color"
+	"github.com/haraldpdl/dpilot/pkg/ddev"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/mattn/go-isatty"
 )
+
+// ddevStyle is ddev's default table look (StyleLight box, which already
+// upper-cases headers, plus separated rows), so dpilot's tables sit next to
+// ddev's unnoticed.
+var ddevStyle = func() table.Style {
+	s := table.StyleLight
+	s.Options.SeparateRows = true
+	return s
+}()
+
+func newTable(w io.Writer) table.Writer {
+	t := table.NewWriter()
+	t.SetOutputMirror(w)
+	t.SetStyle(ddevStyle)
+	return t
+}
 
 // GroupRow is one row of `dpilot list`. Error is set for a group whose file
 // could not be loaded; its counts are then zero.
@@ -50,6 +66,8 @@ func writeJSON(w io.Writer, msg string, raw any) error {
 // Info writes one ddev-style info envelope: text in msg, data in raw.
 func Info(w io.Writer, msg string, raw any) error { return writeJSON(w, msg, raw) }
 
+// colorize is stricter than ddev, which colours whenever NO_COLOR is unset:
+// piped output never carries escape codes here.
 func colorize(w io.Writer) bool {
 	f, ok := w.(*os.File)
 	if !ok {
@@ -58,34 +76,36 @@ func colorize(w io.Writer) bool {
 	return os.Getenv("NO_COLOR") == "" && isatty.IsTerminal(f.Fd())
 }
 
+// colorStatus renders a status word the way ddev does: same label, same
+// colour, and no escape codes when colour is off.
 func colorStatus(s string, enabled bool) string {
+	st := ddev.ProjectStatus(s)
 	if !enabled {
-		return s
+		return st.Label()
 	}
-	var c *color.Color
-	switch s {
-	case "running":
-		c = color.New(color.FgGreen)
-	case "missing":
-		c = color.New(color.FgRed)
+	var c text.Color
+	switch st.Tone() {
+	case ddev.ToneWarn:
+		c = text.FgYellow
+	case ddev.ToneBad:
+		c = text.FgRed
 	default:
-		c = color.New(color.FgYellow)
+		c = text.FgGreen
 	}
-	c.EnableColor()
-	return c.Sprint(s)
+	return c.Sprint(st.Label())
 }
 
 // Groups renders the group list as a table or JSON. Invalid groups appear in
 // the table marked "invalid", with their errors listed below it.
 func Groups(w io.Writer, rows []GroupRow, jsonOut bool) error {
-	text := renderGroups(rows)
+	out := renderGroups(rows)
 	if jsonOut {
 		if rows == nil {
 			rows = []GroupRow{}
 		}
-		return writeJSON(w, text, rows)
+		return writeJSON(w, out, rows)
 	}
-	_, err := io.WriteString(w, text)
+	_, err := io.WriteString(w, out)
 	return err
 }
 
@@ -94,8 +114,7 @@ func renderGroups(rows []GroupRow) string {
 		return "No dpilot groups found. Run 'dpilot create <group>' to make one.\n"
 	}
 	var b strings.Builder
-	t := table.NewWriter()
-	t.SetOutputMirror(&b)
+	t := newTable(&b)
 	t.AppendHeader(table.Row{"GROUP", "MEMBERS", "RUNNING"})
 	// Pin the numeric columns: an "invalid" cell would otherwise flip
 	// go-pretty's content-based alignment for every row.
@@ -133,8 +152,7 @@ func Describe(w io.Writer, group string, rows []MemberRow, jsonOut bool) error {
 
 func renderDescribe(rows []MemberRow, color bool) string {
 	var b strings.Builder
-	t := table.NewWriter()
-	t.SetOutputMirror(&b)
+	t := newTable(&b)
 	t.AppendHeader(table.Row{"#", "PROJECT", "STATUS"})
 	for i, r := range rows {
 		t.AppendRow(table.Row{i + 1, r.Name, colorStatus(r.Status, color)})

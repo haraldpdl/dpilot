@@ -1,5 +1,7 @@
 package ddev
 
+import "strings"
+
 // ProjectStatus mirrors ddev's project status strings.
 type ProjectStatus string
 
@@ -31,4 +33,37 @@ type Describe struct {
 // Ready reports whether the project is running.
 func (d *Describe) Ready() bool {
 	return d.Status == StatusRunning
+}
+
+// Tone is how a status should be coloured; the CLI and TUI map it to their
+// own colour systems so both follow ddev's rules from one place.
+type Tone int
+
+const (
+	ToneGood Tone = iota // green
+	ToneWarn             // yellow
+	ToneBad              // red
+)
+
+// Tone mirrors ddev's FormatSiteStatus: paused is yellow; stopped, exited,
+// unhealthy and every "missing" status (dpilot's own, ddev's "project
+// directory missing" and ".ddev/config.yaml missing") are red; anything else,
+// running included, is green.
+func (s ProjectStatus) Tone() Tone {
+	switch {
+	case strings.Contains(string(s), string(StatusPaused)):
+		return ToneWarn
+	case strings.Contains(string(s), "missing"), s == StatusStopped, s == "unhealthy", s == "exited":
+		return ToneBad
+	default:
+		return ToneGood
+	}
+}
+
+// Label is the status word to display: ddev shows a running project as "OK".
+func (s ProjectStatus) Label() string {
+	if s == StatusRunning {
+		return "OK"
+	}
+	return string(s)
 }

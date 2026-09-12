@@ -245,3 +245,13 @@ func TestEditorEditsGroupWithOrphansWhenDdevListsNothing(t *testing.T) {
 		t.Fatalf("a group with members must be editable even when ddev lists no projects, phase=%d", e.phase)
 	}
 }
+
+func TestStatusColorKeepsDdevTuiWording(t *testing.T) {
+	// ddev's own TUI shows the raw status word (its tables show OK); follow the TUI here.
+	if got := statusColor("running"); !strings.Contains(got, "running") || strings.Contains(got, "OK") {
+		t.Fatalf("running should keep its word in the TUI, got %q", got)
+	}
+	if got := statusColor("stopped"); !strings.Contains(got, "stopped") {
+		t.Fatalf("stopped should keep its word, got %q", got)
+	}
+}

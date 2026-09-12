@@ -112,7 +112,7 @@ func TestListSurvivesBrokenGroupFile(t *testing.T) {
 	if !strings.Contains(out, "good") || !strings.Contains(out, "broken") || !strings.Contains(out, "invalid") {
 		t.Fatalf("both groups should be listed, the broken one marked invalid: %q", out)
 	}
-	if !strings.Contains(out, "|       1 |       1 |") {
+	if !strings.Contains(out, "│       1 │       1 │") {
 		t.Fatalf("the good group's counts should still render: %q", out)
 	}
 }

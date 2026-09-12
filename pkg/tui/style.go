@@ -5,6 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/haraldpdl/dpilot/pkg/ddev"
 )
 
 var (
@@ -13,18 +14,24 @@ var (
 	dimStyle    = lipgloss.NewStyle().Faint(true)
 )
 
-// statusColor styles a ddev status string to match the output package's colors.
+// statusColor renders a ddev status in the tone ddev uses, from the same
+// mapping as the CLI tables (ddev.ProjectStatus.Tone). Like ddev's own TUI it
+// keeps the raw word; only the CLI tables say "OK" for running.
 func statusColor(status string) string {
-	switch status {
-	case "running":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Render(status)
-	case "missing":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Render(status)
-	case "":
+	if status == "" {
 		return status
-	default:
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Render(status)
 	}
+	st := ddev.ProjectStatus(status)
+	var c lipgloss.Color
+	switch st.Tone() {
+	case ddev.ToneWarn:
+		c = lipgloss.Color("3")
+	case ddev.ToneBad:
+		c = lipgloss.Color("1")
+	default:
+		c = lipgloss.Color("2")
+	}
+	return lipgloss.NewStyle().Foreground(c).Render(string(st))
 }
 
 // keyRune reports whether a key message is exactly the single rune r.
