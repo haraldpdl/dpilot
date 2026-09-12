@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/haraldpdl/dpilot/pkg/config"
@@ -19,7 +20,7 @@ func execAction(verb, group string) tea.Cmd {
 		self = os.Args[0]
 	}
 	return tea.ExecProcess(exec.Command(self, selfArgs(verb, group)...), func(err error) tea.Msg {
-		return actionDoneMsg{err: err}
+		return actionDoneMsg{verb: verb, group: group, err: err}
 	})
 }
 
@@ -33,6 +34,14 @@ func RunDashboard(loader Loader) error {
 	return err
 }
 
+// ddevTimeout bounds every ddev call the dashboard makes, so a wedged Docker
+// daemon cannot hang the TUI and no ddev child outlives it.
+const ddevTimeout = 15 * time.Second
+
+func ddevCtx() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), ddevTimeout)
+}
+
 // ProductionLoader wires the dashboard to the real config/ddev/orchestrator.
 func ProductionLoader(client ddev.Client) Loader {
 	return Loader{
@@ -42,19 +51,27 @@ func ProductionLoader(client ddev.Client) Loader {
 			if err != nil {
 				return nil, err
 			}
-			return orchestrator.New(client).Statuses(context.Background(), g)
+			ctx, cancel := ddevCtx()
+			defer cancel()
+			return orchestrator.New(client).Statuses(ctx, g)
 		},
-		Delete:   config.Delete,
-		Projects: func() ([]ddev.Project, error) { return client.List(context.Background()) },
-		Load:     config.Load,
-		Save:     config.Save,
-		Exists:   func(n string) bool { ok, _ := config.Exists(n); return ok },
-		Exec:     execAction,
+		Delete: config.Delete,
+		Projects: func() ([]ddev.Project, error) {
+			ctx, cancel := ddevCtx()
+			defer cancel()
+			return client.List(ctx)
+		},
+		Load:   config.Load,
+		Save:   config.Save,
+		Exists: func(n string) bool { ok, _ := config.Exists(n); return ok },
+		Exec:   execAction,
 	}
 }
 
 func groupRows(client ddev.Client) ([]GroupRow, error) {
-	summaries, err := orchestrator.GroupSummaries(context.Background(), client)
+	ctx, cancel := ddevCtx()
+	defer cancel()
+	summaries, err := orchestrator.GroupSummaries(ctx, client)
 	if err != nil {
 		return nil, err
 	}

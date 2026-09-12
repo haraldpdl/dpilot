@@ -134,6 +134,10 @@ func (e Editor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return e, nil
 	}
+	if key.Type == tea.KeyCtrlC {
+		e.saved, e.phase = false, editorDone
+		return e, tea.Quit
+	}
 	switch e.phase {
 	case phaseName:
 		switch key.Type {
